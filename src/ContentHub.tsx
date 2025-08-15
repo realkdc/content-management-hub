@@ -287,25 +287,105 @@ const deleteFileFromSupabase = async (fileId: number): Promise<void> => {
   }
 };
 
+const deleteProjectFromSupabase = async (projectId: number): Promise<void> => {
+  try {
+    // First delete all files for this project
+    const { error: filesError } = await supabase
+      .from('project_files')
+      .delete()
+      .eq('project_id', projectId);
+    
+    if (filesError) throw filesError;
+    
+    // Then delete the project
+    const { error: projectError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId);
+    
+    if (projectError) throw projectError;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
+  }
+};
+
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{
+    name: string;
+    role: UserRole;
+    email: string;
+  } | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Simple password-based authentication
+  const rolePasswords = {
+    admin: 'admin123',
+    editor: 'editor123', 
+    client: 'client123'
+  };
+
+  const handleLogin = () => {
+    let userRole: UserRole | null = null;
+    let userName = '';
+
+    if (loginPassword === rolePasswords.admin) {
+      userRole = 'admin';
+      userName = 'Admin User';
+    } else if (loginPassword === rolePasswords.editor) {
+      userRole = 'editor';
+      userName = 'Editor User';
+    } else if (loginPassword === rolePasswords.client) {
+      userRole = 'client';
+      userName = 'Client User';
+    }
+
+    if (userRole) {
+      setCurrentUser({
+        name: userName,
+        role: userRole,
+        email: `${userRole}@example.com`
+      });
+      setShowLoginModal(false);
+      setLoginPassword('');
+    } else {
+      alert('Invalid password. Try: admin123, editor123, or client123');
+    }
+  };
 
   // Load data from Supabase on component mount
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       setLoading(true);
       const [projectsData, clientsData] = await Promise.all([
         loadProjectsFromSupabase(),
         loadClientsFromSupabase()
       ]);
-      setProjects(projectsData);
+      
+      // Filter projects based on user role
+      let filteredProjects = projectsData;
+      if (currentUser.role === 'client') {
+        // Clients only see approved and final delivered projects
+        filteredProjects = projectsData.filter(p => 
+          p.status === 'approved' || p.status === 'final_delivered'
+        );
+      }
+      
+      setProjects(filteredProjects);
       setClients(clientsData);
       setLoading(false);
     };
     loadData();
-  }, []);
+  }, [currentUser]);
 
   // Sample projects are now loaded from Supabase database
 
@@ -324,11 +404,6 @@ const ContentHub = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
-  const [currentUser, setCurrentUser] = useState({
-    name: 'Admin User', // In real app, this would come from authentication
-    role: 'admin' as UserRole,
-    email: 'admin@example.com'
-  });
   const [newProject, setNewProject] = useState<{
     client: string;
     title: string;
@@ -578,7 +653,7 @@ const ContentHub = () => {
           url: fileUrl,
           s3Key: s3Key,
           version: version,
-          uploadedBy: currentUser.name,
+          uploadedBy: currentUser?.name || 'Unknown',
           isLatest: true,
           previousVersionId: getLatestFileVersion(existingFiles, file.name)?.id
         };
@@ -721,10 +796,17 @@ const ContentHub = () => {
     alert('Feedback saved successfully!');
   };
 
-  const deleteProject = (projectId: number) => {
-    setProjects(prev => prev.filter(project => project.id !== projectId));
-    if (selectedProject?.id === projectId) {
-      setSelectedProject(null);
+  const deleteProject = async (projectId: number) => {
+    try {
+      await deleteProjectFromSupabase(projectId);
+      setProjects(prev => prev.filter(project => project.id !== projectId));
+      if (selectedProject?.id === projectId) {
+        setSelectedProject(null);
+      }
+      alert('Project deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      alert('Failed to delete project. Please try again.');
     }
   };
 
@@ -1121,11 +1203,76 @@ const ContentHub = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Access Content Hub</h2>
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="password"
+                    placeholder="Enter access code"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={handleLogin}
+                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Access Hub
+                </button>
+                <div className="text-sm text-gray-500 mt-4">
+                  <p><strong>Admin:</strong> admin123 (Full access)</p>
+                  <p><strong>Editor:</strong> editor123 (Projects only)</p>
+                  <p><strong>Client:</strong> client123 (Approved files only)</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!currentUser && !showLoginModal && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <p className="text-gray-600">Please login to access the Content Hub</p>
+            <button 
+              onClick={() => setShowLoginModal(true)}
+              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Login
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentUser && (
+        <>
+          {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <h1 className="text-2xl font-bold text-gray-900">Content Hub</h1>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                {currentUser.name} ({currentUser.role})
+              </span>
+              <button
+                onClick={() => {
+                  setCurrentUser(null);
+                  setShowLoginModal(true);
+                  setActiveTab('dashboard');
+                }}
+                className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition-colors"
+              >
+                Logout
+              </button>
+            </div>
             <div className="flex items-center space-x-4">
               <button 
                 onClick={() => {
@@ -1190,9 +1337,9 @@ const ContentHub = () => {
         <nav className="flex space-x-8 mb-8">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            { id: 'projects', label: 'All Projects', icon: FileText },
+            { id: 'projects', label: currentUser?.role === 'client' ? 'Your Projects' : 'All Projects', icon: FileText },
             { id: 'calendar', label: 'Calendar', icon: Calendar },
-            { id: 'clients', label: 'Clients', icon: User }
+            ...(currentUser?.role !== 'editor' ? [{ id: 'clients', label: 'Clients', icon: User }] : [])
           ].map((tab) => (
             <button
               key={tab.id}
@@ -2254,6 +2401,7 @@ const ContentHub = () => {
             </div>
           </div>
         </div>
+        </>
       )}
     </div>
   );
