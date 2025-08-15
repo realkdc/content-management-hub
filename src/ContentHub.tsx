@@ -890,6 +890,10 @@ const ContentHub = () => {
           <span>Version {project.version}</span>
           <span>Due: {project.dueDate}</span>
         </div>
+        <div className="flex items-center space-x-2">
+          <Upload className="w-4 h-4" />
+          <span>{project.files?.length || 0} file{(project.files?.length || 0) !== 1 ? 's' : ''}</span>
+        </div>
         {project.feedback && (
           <div className="bg-gray-50 p-2 rounded text-xs">
             <strong>Latest feedback:</strong> {project.feedback}
