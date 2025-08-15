@@ -3,7 +3,7 @@ import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock,
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { supabase, DatabaseProject, DatabaseClient, DatabaseProjectFile } from './supabaseClient';
+import { supabase, DatabaseProject, DatabaseClient } from './supabaseClient';
 
 type ProjectStatus = 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
 type ContentType = 'video' | 'image' | 'text';
@@ -98,7 +98,7 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
       targetAudience: project.target_audience,
       platforms: project.platforms || [],
       deliverables: project.deliverables,
-      feedback: project.feedback,
+      feedback: project.feedback || null,
       lastActivity: project.last_activity,
       tags: project.tags || [],
       files: []
@@ -154,7 +154,7 @@ const ContentHub = () => {
   }, []);
 
   // Keep old sample data as fallback (will be replaced by Supabase data)
-  const sampleProjects = [
+  // const sampleProjects = [
     {
       id: 1,
       client: 'Green Wellness Co',
@@ -221,7 +221,7 @@ const ContentHub = () => {
       files: [],
       tags: ['captions', 'weekly', 'social-media']
     }
-  ]; // End sample projects (not used anymore)
+  // ]; // End sample projects (not used anymore)
 
   const [clients, setClients] = useState<Client[]>([]);
 
@@ -1905,9 +1905,5 @@ const ContentHub = () => {
   );
 };
 
-// Add loading state before the main component return
-const ContentHubWithLoading = () => {
-  return <ContentHub />;
-};
-
+// Export the main component
 export default ContentHub;
