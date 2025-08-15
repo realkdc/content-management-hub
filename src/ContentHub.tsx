@@ -204,11 +204,11 @@ const saveFileToSupabase = async (projectId: number, file: ProjectFile): Promise
       .from('project_files')
       .insert([{
         project_id: projectId,
-        filename: file.name,
-        file_size: file.size,
-        file_type: file.type,
+        name: file.name,
+        size: file.size,
+        type: file.type,
         s3_key: file.s3Key,
-        s3_url: file.url,
+        url: file.url,
         upload_date: new Date().toISOString()
       }]);
     
@@ -231,10 +231,10 @@ const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> =>
     
     return (data || []).map((file: any) => ({
       id: file.id,
-      name: file.filename,
-      size: file.file_size,
-      type: file.file_type,
-      url: file.s3_url,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      url: file.url,
       s3Key: file.s3_key,
       uploadDate: file.upload_date,
       uploadedAt: file.upload_date
