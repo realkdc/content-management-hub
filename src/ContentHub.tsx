@@ -294,6 +294,8 @@ const ContentHub = () => {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showEditClientModal, setShowEditClientModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [feedbackInput, setFeedbackInput] = useState('');
   const [newProject, setNewProject] = useState<{
     client: string;
     title: string;
@@ -628,6 +630,32 @@ const ContentHub = () => {
     if (selectedProject && selectedProject.id === projectId) {
       setSelectedProject(prev => prev ? { ...prev, status, lastActivity: 'Just now' } : null);
     }
+  };
+
+  const saveFeedback = (projectId: number) => {
+    if (!feedbackInput.trim()) return;
+    
+    // Update projects array
+    setProjects(prev => prev.map(project => 
+      project.id === projectId 
+        ? { ...project, feedback: feedbackInput.trim(), lastActivity: 'Feedback added' }
+        : project
+    ));
+    
+    // Update selectedProject if it's the one being updated
+    if (selectedProject && selectedProject.id === projectId) {
+      setSelectedProject(prev => prev ? { 
+        ...prev, 
+        feedback: feedbackInput.trim(), 
+        lastActivity: 'Feedback added' 
+      } : null);
+    }
+    
+    // Reset feedback input state
+    setShowFeedbackInput(false);
+    setFeedbackInput('');
+    
+    alert('Feedback saved successfully!');
   };
 
   const deleteProject = (projectId: number) => {
@@ -1432,13 +1460,58 @@ const ContentHub = () => {
                 
                 {/* Feedback Section */}
                 <div>
-                  <span className="font-medium text-gray-700">Latest Feedback:</span>
-                  {selectedProject.feedback ? (
-                    <div className="bg-gray-50 p-3 rounded-lg mt-1">
-                      {selectedProject.feedback}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-700">Latest Feedback:</span>
+                    <button
+                      onClick={() => {
+                        if (!showFeedbackInput) {
+                          setFeedbackInput(selectedProject.feedback || '');
+                        }
+                        setShowFeedbackInput(!showFeedbackInput);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      {showFeedbackInput ? 'Cancel' : (selectedProject.feedback ? 'Edit' : 'Add Feedback')}
+                    </button>
+                  </div>
+                  
+                  {showFeedbackInput ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={feedbackInput}
+                        onChange={(e) => setFeedbackInput(e.target.value)}
+                        placeholder="Enter your feedback here..."
+                        className="w-full p-3 border border-gray-300 rounded-lg resize-none"
+                        rows={3}
+                      />
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => saveFeedback(selectedProject.id)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                        >
+                          Save Feedback
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowFeedbackInput(false);
+                            setFeedbackInput('');
+                          }}
+                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-sm mt-1">No feedback yet</p>
+                    <div>
+                      {selectedProject.feedback ? (
+                        <div className="bg-gray-50 p-3 rounded-lg mt-1">
+                          {selectedProject.feedback}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm mt-1">No feedback yet</p>
+                      )}
+                    </div>
                   )}
                 </div>
                 
