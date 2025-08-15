@@ -12,7 +12,7 @@ export interface DatabaseProject {
   title: string;
   type: 'video' | 'image' | 'text';
   subtype?: string;
-  status: 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
+  status: 'draft' | 'editor_review' | 'client_review' | 'needs_revision' | 'approved' | 'final_delivered';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   version: number;
   due_date: string;
@@ -50,5 +50,9 @@ export interface DatabaseProjectFile {
   upload_date: string;
   url?: string;
   s3_key?: string;
+  version?: string;
+  uploaded_by?: string;
+  is_latest?: boolean;
+  previous_version_id?: string;
   created_at: string;
 }

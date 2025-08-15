@@ -5,8 +5,9 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { supabase, DatabaseProject, DatabaseClient } from './supabaseClient';
 
-type ProjectStatus = 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
+type ProjectStatus = 'draft' | 'editor_review' | 'client_review' | 'needs_revision' | 'approved' | 'final_delivered';
 type ContentType = 'video' | 'image' | 'text';
+type UserRole = 'admin' | 'editor' | 'client';
 
 interface Project {
   id: number;
@@ -39,6 +40,10 @@ interface ProjectFile {
   uploadDate: string;
   url?: string;
   s3Key?: string; // S3 object key for cloud storage
+  version: string; // e.g., "1.0", "1.1", "2.0"
+  uploadedBy?: string; // Who uploaded this version
+  isLatest: boolean; // Is this the current/latest version
+  previousVersionId?: string; // Link to previous version
 }
 
 interface Client {
@@ -61,6 +66,22 @@ const s3Client = new S3Client({
 });
 
 const S3_BUCKET_NAME = process.env.REACT_APP_S3_BUCKET_NAME || 'content-management-hub';
+
+// Helper function to map old status values to new workflow statuses
+const mapOldStatusToNew = (oldStatus: any): ProjectStatus => {
+  const statusMap: {[key: string]: ProjectStatus} = {
+    'in_progress': 'draft',
+    'pending_review': 'client_review',
+    'needs_revision': 'needs_revision',
+    'approved': 'approved',
+    // New statuses map to themselves
+    'draft': 'draft',
+    'editor_review': 'editor_review',
+    'client_review': 'client_review',
+    'final_delivered': 'final_delivered'
+  };
+  return statusMap[oldStatus] || 'draft';
+};
 
 // Local Storage helpers
 const saveToLocalStorage = (key: string, data: any) => {
@@ -87,7 +108,7 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
       title: project.title,
       type: project.type,
       subtype: project.subtype,
-      status: project.status,
+      status: mapOldStatusToNew(project.status),
       priority: project.priority,
       version: project.version,
       dueDate: project.due_date,
@@ -209,7 +230,11 @@ const saveFileToSupabase = async (projectId: number, file: ProjectFile): Promise
         type: file.type,
         s3_key: file.s3Key,
         url: file.url,
-        upload_date: new Date().toISOString()
+        upload_date: new Date().toISOString(),
+        version: file.version,
+        uploaded_by: file.uploadedBy,
+        is_latest: file.isLatest,
+        previous_version_id: file.previousVersionId
       }]);
     
     if (error) throw error;
@@ -237,7 +262,10 @@ const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> =>
       url: file.url,
       s3Key: file.s3_key,
       uploadDate: file.upload_date,
-      uploadedAt: file.upload_date
+      version: file.version || '1.0', // Default version for old files
+      uploadedBy: file.uploaded_by || 'Unknown',
+      isLatest: file.is_latest !== undefined ? file.is_latest : true, // Default to latest for old files
+      previousVersionId: file.previous_version_id
     }));
   } catch (error) {
     console.error('Error loading files:', error);
@@ -296,6 +324,11 @@ const ContentHub = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
+  const [currentUser, setCurrentUser] = useState({
+    name: 'Admin User', // In real app, this would come from authentication
+    role: 'admin' as UserRole,
+    email: 'admin@example.com'
+  });
   const [newProject, setNewProject] = useState<{
     client: string;
     title: string;
@@ -346,20 +379,24 @@ const ContentHub = () => {
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'pending_review': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'draft': return 'bg-gray-100 text-gray-800';
+      case 'editor_review': return 'bg-blue-100 text-blue-800';
+      case 'client_review': return 'bg-yellow-100 text-yellow-800';
       case 'needs_revision': return 'bg-red-100 text-red-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'final_delivered': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: ProjectStatus) => {
     switch (status) {
-      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'pending_review': return <Clock className="w-4 h-4 text-yellow-600" />;
-      case 'in_progress': return <AlertCircle className="w-4 h-4 text-blue-600" />;
+      case 'draft': return <Edit className="w-4 h-4 text-gray-600" />;
+      case 'editor_review': return <Eye className="w-4 h-4 text-blue-600" />;
+      case 'client_review': return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'needs_revision': return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'final_delivered': return <CheckCircle className="w-4 h-4 text-purple-600" />;
       default: return <Clock className="w-4 h-4 text-gray-600" />;
     }
   };
@@ -417,7 +454,7 @@ const ContentHub = () => {
   // Calculate real dashboard statistics
   const getDashboardStats = () => {
     const totalProjects = projects.length;
-    const pendingReview = projects.filter(p => p.status === 'pending_review').length;
+    const pendingReview = projects.filter(p => p.status === 'client_review').length;
     const completedThisMonth = projects.filter(p => {
       const projectDate = new Date(p.dueDate);
       const currentDate = new Date();
@@ -520,6 +557,18 @@ const ContentHub = () => {
         
         const fileUrl = await uploadToS3(file, s3Key, file.name);
         
+        // Get current project to check existing files
+        const currentProject = projects.find(p => p.id === projectId);
+        const existingFiles = currentProject?.files || [];
+        
+        // Generate version number
+        const version = getNextVersion(existingFiles, file.name);
+        
+        // Mark all previous versions of this file as not latest
+        const updatedExistingFiles = existingFiles.map(f => 
+          f.name === file.name ? { ...f, isLatest: false } : f
+        );
+
         const newFile: ProjectFile = {
           id: fileId,
           name: file.name,
@@ -527,7 +576,11 @@ const ContentHub = () => {
           type: file.type,
           uploadDate: new Date().toISOString(),
           url: fileUrl,
-          s3Key: s3Key
+          s3Key: s3Key,
+          version: version,
+          uploadedBy: currentUser.name,
+          isLatest: true,
+          previousVersionId: getLatestFileVersion(existingFiles, file.name)?.id
         };
         
         newFiles.push(newFile);
@@ -536,13 +589,23 @@ const ContentHub = () => {
         await saveFileToSupabase(projectId, newFile);
       }
 
-      // Update the project with new files
+      // Update the project with version-managed files
       setProjects(prev => prev.map(project => 
         project.id === projectId 
           ? { 
               ...project, 
-              files: [...(project.files || []), ...newFiles],
-              lastActivity: `${newFiles.length} file${newFiles.length > 1 ? 's' : ''} uploaded`
+              files: [
+                // Keep existing files (with updated isLatest flags)
+                ...(project.files?.map(f => {
+                  const hasNewVersion = newFiles.some(nf => nf.name === f.name);
+                  return hasNewVersion ? { ...f, isLatest: false } : f;
+                }) || []),
+                // Add new files
+                ...newFiles
+              ],
+              lastActivity: newFiles.length === 1 
+                ? `${newFiles[0].name} v${newFiles[0].version} uploaded`
+                : `${newFiles.length} files uploaded`
             }
           : project
       ));
@@ -770,6 +833,61 @@ const ContentHub = () => {
     }
   };
 
+  // Version management helper functions
+  const getNextVersion = (files: ProjectFile[], fileName: string): string => {
+    const existingVersions = files
+      .filter(f => f.name === fileName)
+      .map(f => f.version)
+      .sort((a, b) => {
+        const [aMajor, aMinor] = a.split('.').map(Number);
+        const [bMajor, bMinor] = b.split('.').map(Number);
+        if (aMajor !== bMajor) return bMajor - aMajor;
+        return bMinor - aMinor;
+      });
+
+    if (existingVersions.length === 0) return '1.0';
+    
+    const latestVersion = existingVersions[0];
+    const [major, minor] = latestVersion.split('.').map(Number);
+    return `${major}.${minor + 1}`;
+  };
+
+  const getLatestFileVersion = (files: ProjectFile[], fileName: string): ProjectFile | null => {
+    const fileVersions = files.filter(f => f.name === fileName);
+    return fileVersions.find(f => f.isLatest) || null;
+  };
+
+  const getStatusDisplayName = (status: ProjectStatus): string => {
+    const statusNames = {
+      'draft': 'Draft',
+      'editor_review': 'Editor Review',
+      'client_review': 'Client Review',
+      'needs_revision': 'Needs Revision',
+      'approved': 'Approved',
+      'final_delivered': 'Final Delivered'
+    };
+    return statusNames[status];
+  };
+
+  const getNextWorkflowStatus = (currentStatus: ProjectStatus): ProjectStatus => {
+    const workflow = {
+      'draft': 'editor_review',
+      'editor_review': 'client_review',
+      'client_review': 'approved',
+      'needs_revision': 'editor_review',
+      'approved': 'final_delivered',
+      'final_delivered': 'final_delivered'
+    } as const;
+    return workflow[currentStatus];
+  };
+
+  const canUserEditProject = (userRole: UserRole, projectStatus: ProjectStatus): boolean => {
+    if (userRole === 'admin') return true;
+    if (userRole === 'editor') return ['draft', 'needs_revision', 'editor_review'].includes(projectStatus);
+    if (userRole === 'client') return ['client_review'].includes(projectStatus);
+    return false;
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -846,7 +964,7 @@ const ContentHub = () => {
       type: newProject.type,
             subtype: newProject.subtype,
             priority: newProject.priority,
-            status: 'in_progress',
+            status: 'draft',
       version: 1,
             due_date: newProject.dueDate,
             estimated_hours: newProject.estimatedHours,
@@ -935,7 +1053,7 @@ const ContentHub = () => {
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
           <div className="flex items-center space-x-1">
             {getStatusIcon(project.status)}
-            <span>{project.status.replace('_', ' ')}</span>
+            <span>{getStatusDisplayName(project.status)}</span>
           </div>
         </div>
       </div>
@@ -972,7 +1090,7 @@ const ContentHub = () => {
           <span>View</span>
         </button>
         <button 
-          onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'pending_review' : 'approved')}
+          onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
           className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
           title="Toggle Status"
         >
@@ -1176,10 +1294,12 @@ const ContentHub = () => {
                       className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="all">All Status</option>
-                      <option value="in_progress">🔄 In Progress</option>
-                      <option value="pending_review">⏳ Pending Review</option>
+                      <option value="draft">📝 Draft</option>
+                      <option value="editor_review">👁️ Editor Review</option>
+                      <option value="client_review">📤 Client Review</option>
                       <option value="needs_revision">🔧 Needs Revision</option>
                       <option value="approved">✅ Approved</option>
+                      <option value="final_delivered">🎯 Final Delivered</option>
                     </select>
                   </div>
 
@@ -1243,10 +1363,12 @@ const ContentHub = () => {
                     className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">All Status</option>
-                    <option value="in_progress">🔄 In Progress</option>
-                    <option value="pending_review">⏳ Pending Review</option>
+                    <option value="draft">📝 Draft</option>
+                    <option value="editor_review">👁️ Editor Review</option>
+                    <option value="client_review">📤 Client Review</option>
                     <option value="needs_revision">🔧 Needs Revision</option>
                     <option value="approved">✅ Approved</option>
+                    <option value="final_delivered">🎯 Final Delivered</option>
                   </select>
                 </div>
 
@@ -1314,7 +1436,7 @@ const ContentHub = () => {
                         </div>
                         <div className="flex items-center space-x-3">
                           <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
-                            {project.status.replace('_', ' ')}
+                            {getStatusDisplayName(project.status)}
                           </div>
                           <div className="text-right">
                             <p className={`text-sm font-medium ${
@@ -1563,8 +1685,17 @@ const ContentHub = () => {
                              file.type.startsWith('video/') ? <Video className="w-4 h-4" /> : 
                              <FileText className="w-4 h-4" />}
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                              <p className="text-xs text-gray-500">{formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString()}</p>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                                <span className={`text-xs px-2 py-1 rounded-full ${file.isLatest ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                  v{file.version}
+                                </span>
+                                {file.isLatest && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Latest</span>}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString()}
+                                {file.uploadedBy && ` • by ${file.uploadedBy}`}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-1">
@@ -1634,16 +1765,43 @@ const ContentHub = () => {
                 <div className="border-t pt-4">
                   <h3 className="font-medium text-gray-700 mb-2">Actions</h3>
                   <div className="flex flex-wrap gap-2">
-                    <select 
-                      value={selectedProject.status} 
-                      onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
-                      className="border border-gray-300 px-3 py-2 rounded text-sm"
-                    >
-                      <option value="in_progress">In Progress</option>
-                      <option value="pending_review">Pending Review</option>
-                      <option value="needs_revision">Needs Revision</option>
-                      <option value="approved">Approved</option>
-                    </select>
+                    <div className="flex items-center space-x-2">
+                      <select 
+                        value={selectedProject.status} 
+                        onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
+                        className="border border-gray-300 px-3 py-2 rounded text-sm"
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="editor_review">Editor Review</option>
+                        <option value="client_review">Client Review</option>
+                        <option value="needs_revision">Needs Revision</option>
+                        <option value="approved">Approved</option>
+                        <option value="final_delivered">Final Delivered</option>
+                      </select>
+                      
+                      {/* Quick workflow action buttons */}
+                      {selectedProject.status !== 'final_delivered' && (
+                        <button
+                          onClick={() => updateProjectStatus(selectedProject.id, getNextWorkflowStatus(selectedProject.status))}
+                          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
+                        >
+                          {selectedProject.status === 'draft' ? 'Send to Review' :
+                           selectedProject.status === 'editor_review' ? 'Send to Client' :
+                           selectedProject.status === 'client_review' ? 'Approve' :
+                           selectedProject.status === 'needs_revision' ? 'Resubmit' :
+                           selectedProject.status === 'approved' ? 'Mark Final' : 'Next'}
+                        </button>
+                      )}
+                      
+                      {(selectedProject.status === 'editor_review' || selectedProject.status === 'client_review') && (
+                        <button
+                          onClick={() => updateProjectStatus(selectedProject.id, 'needs_revision')}
+                          className="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700"
+                        >
+                          Request Changes
+                        </button>
+                      )}
+                    </div>
                     <button 
                       onClick={() => deleteProject(selectedProject.id)}
                       className="border border-red-300 text-red-600 px-4 py-2 rounded hover:bg-red-50 text-sm flex items-center space-x-1"
