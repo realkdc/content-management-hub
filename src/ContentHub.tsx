@@ -3,6 +3,7 @@ import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock,
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { supabase, DatabaseProject, DatabaseClient, DatabaseProjectFile } from './supabaseClient';
 
 type ProjectStatus = 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
 type ContentType = 'video' | 'image' | 'text';
@@ -70,20 +71,90 @@ const saveToLocalStorage = (key: string, data: any) => {
   }
 };
 
-const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+// Supabase data functions
+const loadProjectsFromSupabase = async (): Promise<Project[]> => {
   try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []).map((project: DatabaseProject) => ({
+      id: project.id,
+      client: project.client,
+      title: project.title,
+      type: project.type,
+      subtype: project.subtype,
+      status: project.status,
+      priority: project.priority,
+      version: project.version,
+      dueDate: project.due_date,
+      estimatedHours: project.estimated_hours,
+      budget: project.budget,
+      description: project.description,
+      objectives: project.objectives,
+      targetAudience: project.target_audience,
+      platforms: project.platforms || [],
+      deliverables: project.deliverables,
+      feedback: project.feedback,
+      lastActivity: project.last_activity,
+      tags: project.tags || [],
+      files: []
+    }));
   } catch (error) {
-    console.error('Error loading from localStorage:', error);
-    return defaultValue;
+    console.error('Error loading projects:', error);
+    return [];
+  }
+};
+
+const loadClientsFromSupabase = async (): Promise<Client[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []).map((client: DatabaseClient) => ({
+      id: client.id,
+      name: client.name,
+      email: client.email,
+      company: client.company,
+      phone: client.phone,
+      projects: [], // We'll populate this separately if needed
+      createdDate: client.created_date
+    }));
+  } catch (error) {
+    console.error('Error loading clients:', error);
+    return [];
   }
 };
 
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [projects, setProjects] = useState<Project[]>(() => 
-    loadFromLocalStorage('projects', [
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from Supabase on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      const [projectsData, clientsData] = await Promise.all([
+        loadProjectsFromSupabase(),
+        loadClientsFromSupabase()
+      ]);
+      setProjects(projectsData);
+      setClients(clientsData);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // Keep old sample data as fallback (will be replaced by Supabase data)
+  const sampleProjects = [
     {
       id: 1,
       client: 'Green Wellness Co',
@@ -150,39 +221,9 @@ const ContentHub = () => {
       files: [],
       tags: ['captions', 'weekly', 'social-media']
     }
-    ])
-  );
+  ]; // End sample projects (not used anymore)
 
-  const [clients, setClients] = useState<Client[]>(() =>
-    loadFromLocalStorage('clients', [
-      {
-        id: 1,
-        name: 'Sarah Johnson',
-        email: 'sarah@greenwellness.com',
-        company: 'Green Wellness Co',
-        phone: '+1 (555) 123-4567',
-        projects: [1],
-        createdDate: '2025-01-10'
-      },
-      {
-        id: 2,
-        name: 'Mike Chen',
-        email: 'mike@urbandispensary.com',
-        company: 'Urban Dispensary',
-        phone: '+1 (555) 987-6543',
-        projects: [2],
-        createdDate: '2025-01-15'
-      },
-      {
-        id: 3,
-        name: 'Lisa Rodriguez',
-        email: 'lisa@hempcollective.com',
-        company: 'Hemp Collective',
-        projects: [3],
-        createdDate: '2025-01-08'
-      }
-    ])
-  );
+  const [clients, setClients] = useState<Client[]>([]);
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -647,40 +688,73 @@ const ContentHub = () => {
     }
   };
 
-  const saveNewProject = () => {
+  const saveNewProject = async () => {
     if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) return;
     
-    const project: Project = {
-      id: projects.length + 1,
-      client: newProject.client,
-      title: newProject.title,
-      type: newProject.type,
-      subtype: newProject.subtype,
-      priority: newProject.priority,
-      status: 'in_progress' as ProjectStatus,
-      version: 1,
-      dueDate: newProject.dueDate,
-      estimatedHours: newProject.estimatedHours,
-      budget: newProject.budget,
-      description: newProject.description,
-      objectives: newProject.objectives,
-      targetAudience: newProject.targetAudience,
-      platforms: newProject.platforms,
-      deliverables: newProject.deliverables,
-      feedback: null,
-      lastActivity: 'Just created',
-      files: [],
-      tags: newProject.tags
-    };
+    try {
+      // Insert project into Supabase
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([
+          {
+            client: newProject.client,
+            title: newProject.title,
+            type: newProject.type,
+            subtype: newProject.subtype,
+            priority: newProject.priority,
+            status: 'in_progress',
+            version: 1,
+            due_date: newProject.dueDate,
+            estimated_hours: newProject.estimatedHours,
+            budget: newProject.budget,
+            description: newProject.description,
+            objectives: newProject.objectives,
+            target_audience: newProject.targetAudience,
+            platforms: newProject.platforms,
+            deliverables: newProject.deliverables,
+            feedback: null,
+            last_activity: new Date().toISOString(),
+            tags: newProject.tags
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Convert database format to app format
+      const newProjectData: Project = {
+        id: data.id,
+        client: data.client,
+        title: data.title,
+        type: data.type,
+        subtype: data.subtype,
+        status: data.status,
+        priority: data.priority,
+        version: data.version,
+        dueDate: data.due_date,
+        estimatedHours: data.estimated_hours,
+        budget: data.budget,
+        description: data.description,
+        objectives: data.objectives,
+        targetAudience: data.target_audience,
+        platforms: data.platforms || [],
+        deliverables: data.deliverables,
+        feedback: data.feedback,
+        lastActivity: data.last_activity,
+        tags: data.tags || [],
+        files: []
+      };
+
+      // Add to local state
+      setProjects(prev => [...prev, newProjectData]);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Failed to save project. Please try again.');
+      return;
+    }
     
-    // Update client's project list
-    setClients(prev => prev.map(client => 
-      client.company === newProject.client || client.name === newProject.client
-        ? { ...client, projects: [...client.projects, project.id] }
-        : client
-    ));
-    
-    setProjects([...projects, project]);
+    // Reset form and close modal
     setNewProject({
       client: '',
       title: '',
@@ -766,6 +840,18 @@ const ContentHub = () => {
       </div>
     </div>
   );
+
+  // Show loading state while data is being fetched
+  if (loading) {
+    return (
+      <div className="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your projects...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1817,6 +1903,11 @@ const ContentHub = () => {
       )}
     </div>
   );
+};
+
+// Add loading state before the main component return
+const ContentHubWithLoading = () => {
+  return <ContentHub />;
 };
 
 export default ContentHub;
