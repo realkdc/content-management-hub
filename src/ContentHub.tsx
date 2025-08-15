@@ -81,7 +81,7 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
     
     if (error) throw error;
     
-    return (data || []).map((project: DatabaseProject) => ({
+    const projects = await Promise.all((data || []).map(async (project: DatabaseProject) => ({
       id: project.id,
       client: project.client,
       title: project.title,
@@ -101,8 +101,10 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
       feedback: project.feedback || null,
       lastActivity: project.last_activity,
       tags: project.tags || [],
-      files: []
-    }));
+      files: await loadFilesForProject(project.id)
+    })));
+    
+    return projects;
   } catch (error) {
     console.error('Error loading projects:', error);
     return [];
@@ -192,6 +194,67 @@ const deleteClientFromSupabase = async (clientId: number): Promise<void> => {
     if (error) throw error;
   } catch (error) {
     console.error('Error deleting client:', error);
+    throw error;
+  }
+};
+
+const saveFileToSupabase = async (projectId: number, file: ProjectFile): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('project_files')
+      .insert([{
+        project_id: projectId,
+        filename: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        s3_key: file.s3Key,
+        s3_url: file.url,
+        upload_date: new Date().toISOString()
+      }]);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error saving file record:', error);
+    throw error;
+  }
+};
+
+const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('project_files')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('upload_date', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []).map((file: any) => ({
+      id: file.id,
+      name: file.filename,
+      size: file.file_size,
+      type: file.file_type,
+      url: file.s3_url,
+      s3Key: file.s3_key,
+      uploadDate: file.upload_date,
+      uploadedAt: file.upload_date
+    }));
+  } catch (error) {
+    console.error('Error loading files:', error);
+    return [];
+  }
+};
+
+const deleteFileFromSupabase = async (fileId: number): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('project_files')
+      .delete()
+      .eq('id', fileId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting file record:', error);
     throw error;
   }
 };
@@ -406,7 +469,7 @@ const ContentHub = () => {
       if (fileName) {
         setUploadProgress(prev => ({...prev, [fileName]: 75}));
       }
-      
+
       await s3Client.send(command);
       
       // Update progress - complete
@@ -466,6 +529,9 @@ const ContentHub = () => {
         };
         
         newFiles.push(newFile);
+        
+        // Save file record to Supabase
+        await saveFileToSupabase(projectId, newFile);
       }
 
       // Update the project with new files
@@ -521,10 +587,10 @@ const ContentHub = () => {
     
     if (fileToDelete && fileToDelete.s3Key) {
       // Delete from S3 - all files should have s3Key now
-      try {
-        await deleteFromS3(fileToDelete.s3Key);
-      } catch (error) {
-        console.error('Failed to delete from S3:', error);
+        try {
+          await deleteFromS3(fileToDelete.s3Key);
+        } catch (error) {
+          console.error('Failed to delete from S3:', error);
         alert('Failed to delete file from S3. Please try again.');
         return; // Don't update UI if S3 delete failed
       }
@@ -571,16 +637,16 @@ const ContentHub = () => {
     
     try {
       const client = await saveClientToSupabase({
-        name: newClient.name,
-        email: newClient.email,
-        company: newClient.company,
-        phone: newClient.phone,
+      name: newClient.name,
+      email: newClient.email,
+      company: newClient.company,
+      phone: newClient.phone,
         projects: []
       });
-      
-      setClients([...clients, client]);
-      setNewClient({ name: '', email: '', company: '', phone: '' });
-      setShowNewClientModal(false);
+    
+    setClients([...clients, client]);
+    setNewClient({ name: '', email: '', company: '', phone: '' });
+    setShowNewClientModal(false);
       alert('Client added successfully!');
     } catch (error) {
       console.error('Failed to save client:', error);
@@ -591,7 +657,7 @@ const ContentHub = () => {
   const deleteClient = async (clientId: number) => {
     try {
       await deleteClientFromSupabase(clientId);
-      setClients(prev => prev.filter(client => client.id !== clientId));
+    setClients(prev => prev.filter(client => client.id !== clientId));
       alert('Client deleted successfully!');
     } catch (error) {
       console.error('Failed to delete client:', error);
@@ -620,16 +686,16 @@ const ContentHub = () => {
         company: newClient.company,
         phone: newClient.phone
       });
-      
-      setClients(prev => prev.map(client => 
-        client.id === selectedClient.id 
-          ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
-          : client
-      ));
-      
-      setNewClient({ name: '', email: '', company: '', phone: '' });
-      setSelectedClient(null);
-      setShowEditClientModal(false);
+    
+    setClients(prev => prev.map(client => 
+      client.id === selectedClient.id 
+        ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
+        : client
+    ));
+    
+    setNewClient({ name: '', email: '', company: '', phone: '' });
+    setSelectedClient(null);
+    setShowEditClientModal(false);
       alert('Client updated successfully!');
     } catch (error) {
       console.error('Failed to update client:', error);
@@ -716,13 +782,13 @@ const ContentHub = () => {
         .from('projects')
         .insert([
           {
-            client: newProject.client,
-            title: newProject.title,
-            type: newProject.type,
+      client: newProject.client,
+      title: newProject.title,
+      type: newProject.type,
             subtype: newProject.subtype,
             priority: newProject.priority,
             status: 'in_progress',
-            version: 1,
+      version: 1,
             due_date: newProject.dueDate,
             estimated_hours: newProject.estimatedHours,
             budget: newProject.budget,
@@ -731,7 +797,7 @@ const ContentHub = () => {
             target_audience: newProject.targetAudience,
             platforms: newProject.platforms,
             deliverables: newProject.deliverables,
-            feedback: null,
+      feedback: null,
             last_activity: new Date().toISOString(),
             tags: newProject.tags
           }
@@ -800,7 +866,7 @@ const ContentHub = () => {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
-            {getTypeIcon(project.type)}
+          {getTypeIcon(project.type)}
             <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
               {getTypeLabel(project.type)}
             </span>
@@ -1356,15 +1422,15 @@ const ContentHub = () => {
                         }}
                       />
                       {selectedProject.files && selectedProject.files.length > 0 && (
-                                              <button 
-                        onClick={() => downloadAllFilesAsZip(selectedProject)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
-                        title="Download all files as ZIP"
+                        <button 
+                          onClick={() => downloadAllFilesAsZip(selectedProject)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
+                          title="Download all files as ZIP"
                         disabled={isUploading}
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Download ZIP</span>
-                      </button>
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download ZIP</span>
+                        </button>
                       )}
                       <button 
                         onClick={() => document.getElementById(`file-upload-${selectedProject.id}`)?.click()}
@@ -1499,68 +1565,68 @@ const ContentHub = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left Column - Basic Info */}
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Basic Information</h3>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                       Client *
-                    </label>
-                    <select
-                      value={newProject.client}
-                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                  </label>
+                  <select
+                    value={newProject.client}
+                    onChange={(e) => setNewProject({...newProject, client: e.target.value})}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select a client...</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.company}>
-                          {client.company} ({client.name})
-                        </option>
-                      ))}
-                    </select>
-                    {clients.length === 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        No clients found. <button 
-                          onClick={() => {setShowNewProjectModal(false); setShowNewClientModal(true);}}
-                          className="text-blue-600 hover:underline"
-                        >
-                          Add a client first
-                        </button>
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  >
+                    <option value="">Select a client...</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.company}>
+                        {client.company} ({client.name})
+                      </option>
+                    ))}
+                  </select>
+                  {clients.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      No clients found. <button 
+                        onClick={() => {setShowNewProjectModal(false); setShowNewClientModal(true);}}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Add a client first
+                      </button>
+                    </p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                       Project Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={newProject.title}
-                      onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                  </label>
+                  <input
+                    type="text"
+                    value={newProject.title}
+                    onChange={(e) => setNewProject({...newProject, title: e.target.value})}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Instagram Reel - Product Launch"
-                    />
-                  </div>
-                  
+                    placeholder="e.g., Instagram Reel - Product Launch"
+                  />
+                </div>
+                
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                         Content Type *
-                      </label>
-                      <select
-                        value={newProject.type}
-                        onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
+                  </label>
+                  <select
+                    value={newProject.type}
+                    onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="video">🎥 Video</option>
                         <option value="image">🖼️ Image</option>
                         <option value="text">📝 Text/Copy</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                         Subtype
                       </label>
                       <input
@@ -1593,19 +1659,19 @@ const ContentHub = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Due Date *
-                      </label>
-                      <input
-                        type="date"
-                        value={newProject.dueDate}
-                        onChange={(e) => setNewProject({...newProject, dueDate: e.target.value})}
+                  </label>
+                  <input
+                    type="date"
+                    value={newProject.dueDate}
+                    onChange={(e) => setNewProject({...newProject, dueDate: e.target.value})}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                  />
                     </div>
-                  </div>
-                  
+                </div>
+                
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                         Estimated Hours
                       </label>
                       <input
@@ -1641,15 +1707,15 @@ const ContentHub = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description *
-                    </label>
-                    <textarea
-                      value={newProject.description}
-                      onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                  </label>
+                  <textarea
+                    value={newProject.description}
+                    onChange={(e) => setNewProject({...newProject, description: e.target.value})}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
                       placeholder="Brief description of the project..."
-                    />
-                  </div>
-                  
+                  />
+                </div>
+                
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Objectives/Goals
@@ -1728,19 +1794,19 @@ const ContentHub = () => {
               </div>
               
               <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
-                <button
+                  <button
                   onClick={() => setShowNewProjectModal(false)}
                   className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
+                  >
                   Cancel
-                </button>
-                <button
+                  </button>
+                  <button
                   onClick={saveNewProject}
                   disabled={!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
+                  >
                   Create Project
-                </button>
+                  </button>
               </div>
             </div>
           </div>
