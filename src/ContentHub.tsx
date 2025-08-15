@@ -1959,7 +1959,6 @@ const ContentHub = () => {
               </div>
             </div>
           </div>
-        </>
       )}
 
       {/* New Project Modal - Enhanced */}
