@@ -3,12 +3,19 @@ import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock,
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+<<<<<<< HEAD
 import { supabase, DatabaseProject, DatabaseClient } from './supabaseClient';
 
 type ProjectStatus = 'draft' | 'editor_review' | 'client_review' | 'needs_revision' | 'approved' | 'final_delivered';
 type ContentType = 'video' | 'image' | 'text';
 
 
+=======
+
+type ProjectStatus = 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
+type ContentType = 'video' | 'image' | 'text';
+
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
 interface Project {
   id: number;
   client: string;
@@ -40,10 +47,13 @@ interface ProjectFile {
   uploadDate: string;
   url?: string;
   s3Key?: string; // S3 object key for cloud storage
+<<<<<<< HEAD
   version: string; // e.g., "1.0", "1.1", "2.0"
   uploadedBy?: string; // Who uploaded this version
   isLatest: boolean; // Is this the current/latest version
   previousVersionId?: string; // Link to previous version
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
 }
 
 interface Client {
@@ -67,6 +77,7 @@ const s3Client = new S3Client({
 
 const S3_BUCKET_NAME = process.env.REACT_APP_S3_BUCKET_NAME || 'content-management-hub';
 
+<<<<<<< HEAD
 // Helper function to map old status values to new workflow statuses
 const mapOldStatusToNew = (oldStatus: any): ProjectStatus => {
   const statusMap: {[key: string]: ProjectStatus} = {
@@ -83,6 +94,8 @@ const mapOldStatusToNew = (oldStatus: any): ProjectStatus => {
   return statusMap[oldStatus] || 'draft';
 };
 
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
 // Local Storage helpers
 const saveToLocalStorage = (key: string, data: any) => {
   try {
@@ -92,6 +105,7 @@ const saveToLocalStorage = (key: string, data: any) => {
   }
 };
 
+<<<<<<< HEAD
 // Supabase data functions
 const loadProjectsFromSupabase = async (): Promise<Project[]> => {
   try {
@@ -307,11 +321,21 @@ const deleteProjectFromSupabase = async (projectId: number): Promise<void> => {
   } catch (error) {
     console.error('Error deleting project:', error);
     throw error;
+=======
+const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error('Error loading from localStorage:', error);
+    return defaultValue;
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   }
 };
 
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+<<<<<<< HEAD
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -335,6 +359,109 @@ const ContentHub = () => {
   // Sample projects are now loaded from Supabase database
 
   const [clients, setClients] = useState<Client[]>([]);
+=======
+  const [projects, setProjects] = useState<Project[]>(() => 
+    loadFromLocalStorage('projects', [
+    {
+      id: 1,
+      client: 'Green Wellness Co',
+      title: 'Instagram Reel - Product Launch',
+      type: 'video' as ContentType,
+      subtype: 'Instagram Reel',
+      status: 'pending_review' as ProjectStatus,
+      priority: 'high' as const,
+      version: 3,
+      dueDate: '2025-08-20',
+      estimatedHours: 8,
+      budget: 1500,
+      description: 'Create engaging Instagram Reel to promote new THCA product line',
+      objectives: 'Drive awareness and sales for new product launch',
+      targetAudience: 'Cannabis enthusiasts, 25-45 years old',
+      platforms: ['Instagram', 'TikTok'],
+      deliverables: '60-second vertical video with captions, 3 versions for A/B testing',
+      feedback: 'Need to adjust the intro timing',
+      lastActivity: '2 hours ago',
+      files: [],
+      tags: ['product-launch', 'thca', 'social-media']
+    },
+    {
+      id: 2,
+      client: 'Urban Dispensary',
+      title: 'TikTok Series - Educational Content',
+      type: 'video' as ContentType,
+      subtype: 'TikTok Series',
+      status: 'in_progress' as ProjectStatus,
+      priority: 'medium' as const,
+      version: 1,
+      dueDate: '2025-08-22',
+      estimatedHours: 12,
+      budget: 2000,
+      description: '5-part educational TikTok series about cannabis benefits',
+      objectives: 'Educate audience and build brand authority',
+      targetAudience: 'Cannabis curious consumers, 21-35 years old',
+      platforms: ['TikTok', 'Instagram Reels'],
+      deliverables: '5 educational videos, 60 seconds each, with engaging graphics',
+      feedback: null,
+      lastActivity: '1 day ago',
+      files: [],
+      tags: ['education', 'tiktok', 'series']
+    },
+    {
+      id: 3,
+      client: 'Hemp Collective',
+      title: 'Social Media Captions - Weekly Batch',
+      type: 'text' as ContentType,
+      subtype: 'Social Media Copy',
+      status: 'approved' as ProjectStatus,
+      priority: 'low' as const,
+      version: 2,
+      dueDate: '2025-08-18',
+      estimatedHours: 4,
+      budget: 500,
+      description: 'Weekly batch of social media captions for Instagram and Facebook',
+      objectives: 'Maintain consistent social media presence',
+      targetAudience: 'Existing customers and followers',
+      platforms: ['Instagram', 'Facebook'],
+      deliverables: '14 captions with hashtags and posting schedule',
+      feedback: 'Perfect, approved!',
+      lastActivity: '3 days ago',
+      files: [],
+      tags: ['captions', 'weekly', 'social-media']
+    }
+    ])
+  );
+
+  const [clients, setClients] = useState<Client[]>(() =>
+    loadFromLocalStorage('clients', [
+      {
+        id: 1,
+        name: 'Sarah Johnson',
+        email: 'sarah@greenwellness.com',
+        company: 'Green Wellness Co',
+        phone: '+1 (555) 123-4567',
+        projects: [1],
+        createdDate: '2025-01-10'
+      },
+      {
+        id: 2,
+        name: 'Mike Chen',
+        email: 'mike@urbandispensary.com',
+        company: 'Urban Dispensary',
+        phone: '+1 (555) 987-6543',
+        projects: [2],
+        createdDate: '2025-01-15'
+      },
+      {
+        id: 3,
+        name: 'Lisa Rodriguez',
+        email: 'lisa@hempcollective.com',
+        company: 'Hemp Collective',
+        projects: [3],
+        createdDate: '2025-01-08'
+      }
+    ])
+  );
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -347,8 +474,11 @@ const ContentHub = () => {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showEditClientModal, setShowEditClientModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+<<<<<<< HEAD
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   const [newProject, setNewProject] = useState<{
     client: string;
     title: string;
@@ -399,24 +529,38 @@ const ContentHub = () => {
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
+<<<<<<< HEAD
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'editor_review': return 'bg-blue-100 text-blue-800';
       case 'client_review': return 'bg-yellow-100 text-yellow-800';
       case 'needs_revision': return 'bg-red-100 text-red-800';
       case 'approved': return 'bg-green-100 text-green-800';
       case 'final_delivered': return 'bg-purple-100 text-purple-800';
+=======
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'pending_review': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'needs_revision': return 'bg-red-100 text-red-800';
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: ProjectStatus) => {
     switch (status) {
+<<<<<<< HEAD
       case 'draft': return <Edit className="w-4 h-4 text-gray-600" />;
       case 'editor_review': return <Eye className="w-4 h-4 text-blue-600" />;
       case 'client_review': return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'needs_revision': return <AlertCircle className="w-4 h-4 text-red-600" />;
       case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'final_delivered': return <CheckCircle className="w-4 h-4 text-purple-600" />;
+=======
+      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'pending_review': return <Clock className="w-4 h-4 text-yellow-600" />;
+      case 'in_progress': return <AlertCircle className="w-4 h-4 text-blue-600" />;
+      case 'needs_revision': return <AlertCircle className="w-4 h-4 text-red-600" />;
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
       default: return <Clock className="w-4 h-4 text-gray-600" />;
     }
   };
@@ -474,7 +618,11 @@ const ContentHub = () => {
   // Calculate real dashboard statistics
   const getDashboardStats = () => {
     const totalProjects = projects.length;
+<<<<<<< HEAD
     const pendingReview = projects.filter(p => p.status === 'client_review').length;
+=======
+    const pendingReview = projects.filter(p => p.status === 'pending_review').length;
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
     const completedThisMonth = projects.filter(p => {
       const projectDate = new Date(p.dueDate);
       const currentDate = new Date();
@@ -528,7 +676,11 @@ const ContentHub = () => {
       if (fileName) {
         setUploadProgress(prev => ({...prev, [fileName]: 75}));
       }
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
       await s3Client.send(command);
       
       // Update progress - complete
@@ -577,6 +729,7 @@ const ContentHub = () => {
         
         const fileUrl = await uploadToS3(file, s3Key, file.name);
         
+<<<<<<< HEAD
         // Get current project to check existing files
         const currentProject = projects.find(p => p.id === projectId);
         const existingFiles = currentProject?.files || [];
@@ -589,6 +742,8 @@ const ContentHub = () => {
           f.name === file.name ? { ...f, isLatest: false } : f
         );
         
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
         const newFile: ProjectFile = {
           id: fileId,
           name: file.name,
@@ -596,6 +751,7 @@ const ContentHub = () => {
           type: file.type,
           uploadDate: new Date().toISOString(),
           url: fileUrl,
+<<<<<<< HEAD
           s3Key: s3Key,
           version: version,
           uploadedBy: 'User',
@@ -610,10 +766,20 @@ const ContentHub = () => {
       }
 
       // Update the project with version-managed files
+=======
+          s3Key: s3Key
+        };
+        
+        newFiles.push(newFile);
+      }
+
+      // Update the project with new files
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
       setProjects(prev => prev.map(project => 
         project.id === projectId 
           ? { 
               ...project, 
+<<<<<<< HEAD
               files: [
                 // Keep existing files (with updated isLatest flags)
                 ...(project.files?.map(f => {
@@ -626,6 +792,10 @@ const ContentHub = () => {
               lastActivity: newFiles.length === 1 
                 ? `${newFiles[0].name} v${newFiles[0].version} uploaded`
                 : `${newFiles.length} files uploaded`
+=======
+              files: [...(project.files || []), ...newFiles],
+              lastActivity: `${newFiles.length} file${newFiles.length > 1 ? 's' : ''} uploaded`
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
             }
           : project
       ));
@@ -672,10 +842,17 @@ const ContentHub = () => {
     
     if (fileToDelete && fileToDelete.s3Key) {
       // Delete from S3 - all files should have s3Key now
+<<<<<<< HEAD
         try {
           await deleteFromS3(fileToDelete.s3Key);
         } catch (error) {
           console.error('Failed to delete from S3:', error);
+=======
+      try {
+        await deleteFromS3(fileToDelete.s3Key);
+      } catch (error) {
+        console.error('Failed to delete from S3:', error);
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
         alert('Failed to delete file from S3. Please try again.');
         return; // Don't update UI if S3 delete failed
       }
@@ -708,6 +885,7 @@ const ContentHub = () => {
         ? { ...project, status, lastActivity: 'Just now' }
         : project
     ));
+<<<<<<< HEAD
     
     // Also update selectedProject if it's the one being updated
     if (selectedProject && selectedProject.id === projectId) {
@@ -760,16 +938,39 @@ const ContentHub = () => {
     
     try {
       const client = await saveClientToSupabase({
+=======
+  };
+
+  const deleteProject = (projectId: number) => {
+    setProjects(prev => prev.filter(project => project.id !== projectId));
+    if (selectedProject?.id === projectId) {
+      setSelectedProject(null);
+    }
+  };
+
+  const saveNewClient = () => {
+    if (!newClient.name || !newClient.email || !newClient.company) return;
+    
+    const client: Client = {
+      id: clients.length + 1,
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
       name: newClient.name,
       email: newClient.email,
       company: newClient.company,
       phone: newClient.phone,
+<<<<<<< HEAD
         projects: []
       });
+=======
+      projects: [],
+      createdDate: new Date().toISOString().split('T')[0]
+    };
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
     
     setClients([...clients, client]);
     setNewClient({ name: '', email: '', company: '', phone: '' });
     setShowNewClientModal(false);
+<<<<<<< HEAD
       alert('Client added successfully!');
     } catch (error) {
       console.error('Failed to save client:', error);
@@ -786,6 +987,12 @@ const ContentHub = () => {
       console.error('Failed to delete client:', error);
       alert('Failed to delete client. Please try again.');
     }
+=======
+  };
+
+  const deleteClient = (clientId: number) => {
+    setClients(prev => prev.filter(client => client.id !== clientId));
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   };
 
   const editClient = (client: Client) => {
@@ -799,6 +1006,7 @@ const ContentHub = () => {
     setShowEditClientModal(true);
   };
 
+<<<<<<< HEAD
   const updateClient = async () => {
     if (!selectedClient || !newClient.name || !newClient.email || !newClient.company) return;
     
@@ -810,6 +1018,11 @@ const ContentHub = () => {
         phone: newClient.phone
       });
     
+=======
+  const updateClient = () => {
+    if (!selectedClient || !newClient.name || !newClient.email || !newClient.company) return;
+    
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
     setClients(prev => prev.map(client => 
       client.id === selectedClient.id 
         ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
@@ -819,11 +1032,14 @@ const ContentHub = () => {
     setNewClient({ name: '', email: '', company: '', phone: '' });
     setSelectedClient(null);
     setShowEditClientModal(false);
+<<<<<<< HEAD
       alert('Client updated successfully!');
     } catch (error) {
       console.error('Failed to update client:', error);
       alert('Failed to update client. Please try again.');
     }
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   };
 
   const formatFileSize = (bytes: number) => {
@@ -834,6 +1050,7 @@ const ContentHub = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+<<<<<<< HEAD
   const formatLastActivity = (lastActivity: string) => {
     // If it's already a user-friendly message, return as is
     if (!lastActivity.includes('T') || !lastActivity.includes('Z')) {
@@ -910,6 +1127,8 @@ const ContentHub = () => {
 
 
 
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -972,6 +1191,7 @@ const ContentHub = () => {
     }
   };
 
+<<<<<<< HEAD
   const saveNewProject = async () => {
     if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) return;
     
@@ -1039,6 +1259,42 @@ const ContentHub = () => {
     }
     
     // Reset form and close modal
+=======
+  const saveNewProject = () => {
+    if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) return;
+    
+    const project: Project = {
+      id: projects.length + 1,
+      client: newProject.client,
+      title: newProject.title,
+      type: newProject.type,
+      subtype: newProject.subtype,
+      priority: newProject.priority,
+      status: 'in_progress' as ProjectStatus,
+      version: 1,
+      dueDate: newProject.dueDate,
+      estimatedHours: newProject.estimatedHours,
+      budget: newProject.budget,
+      description: newProject.description,
+      objectives: newProject.objectives,
+      targetAudience: newProject.targetAudience,
+      platforms: newProject.platforms,
+      deliverables: newProject.deliverables,
+      feedback: null,
+      lastActivity: 'Just created',
+      files: [],
+      tags: newProject.tags
+    };
+    
+    // Update client's project list
+    setClients(prev => prev.map(client => 
+      client.company === newProject.client || client.name === newProject.client
+        ? { ...client, projects: [...client.projects, project.id] }
+        : client
+    ));
+    
+    setProjects([...projects, project]);
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
     setNewProject({
       client: '',
       title: '',
@@ -1065,7 +1321,11 @@ const ContentHub = () => {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
+<<<<<<< HEAD
           {getTypeIcon(project.type)}
+=======
+            {getTypeIcon(project.type)}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
             <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
               {getTypeLabel(project.type)}
             </span>
@@ -1075,7 +1335,11 @@ const ContentHub = () => {
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
           <div className="flex items-center space-x-1">
             {getStatusIcon(project.status)}
+<<<<<<< HEAD
             <span>{getStatusDisplayName(project.status)}</span>
+=======
+            <span>{project.status.replace('_', ' ')}</span>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
           </div>
         </div>
       </div>
@@ -1089,17 +1353,24 @@ const ContentHub = () => {
           <span>Version {project.version}</span>
           <span>Due: {project.dueDate}</span>
         </div>
+<<<<<<< HEAD
         <div className="flex items-center space-x-2">
           <Upload className="w-4 h-4" />
           <span>{project.files?.length || 0} file{(project.files?.length || 0) !== 1 ? 's' : ''}</span>
         </div>
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
         {project.feedback && (
           <div className="bg-gray-50 p-2 rounded text-xs">
             <strong>Latest feedback:</strong> {project.feedback}
           </div>
         )}
         <div className="text-xs text-gray-400">
+<<<<<<< HEAD
           {formatLastActivity(project.lastActivity)}
+=======
+          {project.lastActivity}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
         </div>
       </div>
       
@@ -1112,7 +1383,11 @@ const ContentHub = () => {
           <span>View</span>
         </button>
         <button 
+<<<<<<< HEAD
           onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
+=======
+          onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'pending_review' : 'approved')}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
           className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
           title="Toggle Status"
         >
@@ -1129,6 +1404,7 @@ const ContentHub = () => {
     </div>
   );
 
+<<<<<<< HEAD
   // Show loading state while data is being fetched
   if (loading) {
     return (
@@ -1141,13 +1417,19 @@ const ContentHub = () => {
     );
   }
 
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
+<<<<<<< HEAD
                         <h1 className="text-2xl font-bold text-gray-900">Content Hub</h1>
+=======
+            <h1 className="text-2xl font-bold text-gray-900">Content Hub</h1>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
             <div className="flex items-center space-x-4">
               <button 
                 onClick={() => {
@@ -1316,12 +1598,19 @@ const ContentHub = () => {
                       className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="all">All Status</option>
+<<<<<<< HEAD
                       <option value="draft">📝 Draft</option>
                       <option value="editor_review">👁️ Editor Review</option>
                       <option value="client_review">📤 Client Review</option>
                       <option value="needs_revision">🔧 Needs Revision</option>
                       <option value="approved">✅ Approved</option>
                       <option value="final_delivered">🎯 Final Delivered</option>
+=======
+                      <option value="in_progress">🔄 In Progress</option>
+                      <option value="pending_review">⏳ Pending Review</option>
+                      <option value="needs_revision">🔧 Needs Revision</option>
+                      <option value="approved">✅ Approved</option>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                     </select>
                   </div>
 
@@ -1385,12 +1674,19 @@ const ContentHub = () => {
                     className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">All Status</option>
+<<<<<<< HEAD
                     <option value="draft">📝 Draft</option>
                     <option value="editor_review">👁️ Editor Review</option>
                     <option value="client_review">📤 Client Review</option>
                     <option value="needs_revision">🔧 Needs Revision</option>
                     <option value="approved">✅ Approved</option>
                     <option value="final_delivered">🎯 Final Delivered</option>
+=======
+                    <option value="in_progress">🔄 In Progress</option>
+                    <option value="pending_review">⏳ Pending Review</option>
+                    <option value="needs_revision">🔧 Needs Revision</option>
+                    <option value="approved">✅ Approved</option>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                   </select>
                 </div>
 
@@ -1458,7 +1754,11 @@ const ContentHub = () => {
                         </div>
                         <div className="flex items-center space-x-3">
                           <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+<<<<<<< HEAD
                             {getStatusDisplayName(project.status)}
+=======
+                            {project.status.replace('_', ' ')}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                           </div>
                           <div className="text-right">
                             <p className={`text-sm font-medium ${
@@ -1602,6 +1902,7 @@ const ContentHub = () => {
                   </div>
                 </div>
                 
+<<<<<<< HEAD
                 {/* Feedback Section */}
                   <div>
                   <div className="flex items-center justify-between mb-2">
@@ -1658,6 +1959,16 @@ const ContentHub = () => {
                   </div>
                 )}
                 </div>
+=======
+                {selectedProject.feedback && (
+                  <div>
+                    <span className="font-medium text-gray-700">Latest Feedback:</span>
+                    <div className="bg-gray-50 p-3 rounded-lg mt-1">
+                      {selectedProject.feedback}
+                    </div>
+                  </div>
+                )}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                 
                 {/* Files Section */}
                 <div className="border-t pt-4">
@@ -1677,6 +1988,7 @@ const ContentHub = () => {
                         }}
                       />
                       {selectedProject.files && selectedProject.files.length > 0 && (
+<<<<<<< HEAD
                         <button 
                           onClick={() => downloadAllFilesAsZip(selectedProject)}
                           className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
@@ -1686,6 +1998,17 @@ const ContentHub = () => {
                           <Download className="w-3 h-3" />
                           <span>Download ZIP</span>
                         </button>
+=======
+                                              <button 
+                        onClick={() => downloadAllFilesAsZip(selectedProject)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
+                        title="Download all files as ZIP"
+                        disabled={isUploading}
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download ZIP</span>
+                      </button>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                       )}
                       <button 
                         onClick={() => document.getElementById(`file-upload-${selectedProject.id}`)?.click()}
@@ -1707,6 +2030,7 @@ const ContentHub = () => {
                              file.type.startsWith('video/') ? <Video className="w-4 h-4" /> : 
                              <FileText className="w-4 h-4" />}
                             <div className="flex-1">
+<<<<<<< HEAD
                               <div className="flex items-center space-x-2">
                               <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                                 <span className={`text-xs px-2 py-1 rounded-full ${file.isLatest ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
@@ -1718,6 +2042,10 @@ const ContentHub = () => {
                                 {formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString()}
                                 {file.uploadedBy && ` • by ${file.uploadedBy}`}
                               </p>
+=======
+                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                              <p className="text-xs text-gray-500">{formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString()}</p>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                             </div>
                           </div>
                           <div className="flex items-center space-x-1">
@@ -1787,12 +2115,16 @@ const ContentHub = () => {
                 <div className="border-t pt-4">
                   <h3 className="font-medium text-gray-700 mb-2">Actions</h3>
                   <div className="flex flex-wrap gap-2">
+<<<<<<< HEAD
                     <div className="flex items-center space-x-2">
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                     <select 
                       value={selectedProject.status} 
                       onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
                       className="border border-gray-300 px-3 py-2 rounded text-sm"
                     >
+<<<<<<< HEAD
                         <option value="draft">Draft</option>
                         <option value="editor_review">Editor Review</option>
                         <option value="client_review">Client Review</option>
@@ -1824,6 +2156,13 @@ const ContentHub = () => {
                         </button>
                       )}
                     </div>
+=======
+                      <option value="in_progress">In Progress</option>
+                      <option value="pending_review">Pending Review</option>
+                      <option value="needs_revision">Needs Revision</option>
+                      <option value="approved">Approved</option>
+                    </select>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                     <button 
                       onClick={() => deleteProject(selectedProject.id)}
                       className="border border-red-300 text-red-600 px-4 py-2 rounded hover:bg-red-50 text-sm flex items-center space-x-1"
@@ -1856,6 +2195,7 @@ const ContentHub = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left Column - Basic Info */}
+<<<<<<< HEAD
               <div className="space-y-4">
                   <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Basic Information</h3>
                   
@@ -1908,16 +2248,78 @@ const ContentHub = () => {
                   <select
                     value={newProject.type}
                     onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
+=======
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Basic Information</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client *
+                    </label>
+                    <select
+                      value={newProject.client}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select a client...</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.company}>
+                          {client.company} ({client.name})
+                        </option>
+                      ))}
+                    </select>
+                    {clients.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        No clients found. <button 
+                          onClick={() => {setShowNewProjectModal(false); setShowNewClientModal(true);}}
+                          className="text-blue-600 hover:underline"
+                        >
+                          Add a client first
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.title}
+                      onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Instagram Reel - Product Launch"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Type *
+                      </label>
+                      <select
+                        value={newProject.type}
+                        onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="video">🎥 Video</option>
                         <option value="image">🖼️ Image</option>
                         <option value="text">📝 Text/Copy</option>
+<<<<<<< HEAD
                   </select>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+=======
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                         Subtype
                       </label>
                       <input
@@ -1950,6 +2352,7 @@ const ContentHub = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Due Date *
+<<<<<<< HEAD
                   </label>
                   <input
                     type="date"
@@ -1963,6 +2366,21 @@ const ContentHub = () => {
                   <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+=======
+                      </label>
+                      <input
+                        type="date"
+                        value={newProject.dueDate}
+                        onChange={(e) => setNewProject({...newProject, dueDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                         Estimated Hours
                       </label>
                       <input
@@ -1998,6 +2416,7 @@ const ContentHub = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description *
+<<<<<<< HEAD
                   </label>
                   <textarea
                     value={newProject.description}
@@ -2007,6 +2426,17 @@ const ContentHub = () => {
                   />
                 </div>
                 
+=======
+                    </label>
+                    <textarea
+                      value={newProject.description}
+                      onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                      placeholder="Brief description of the project..."
+                    />
+                  </div>
+                  
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Objectives/Goals
@@ -2085,6 +2515,7 @@ const ContentHub = () => {
               </div>
               
               <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+<<<<<<< HEAD
                   <button
                   onClick={() => setShowNewProjectModal(false)}
                   className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -2098,6 +2529,21 @@ const ContentHub = () => {
                   >
                   Create Project
                   </button>
+=======
+                <button
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewProject}
+                  disabled={!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Create Project
+                </button>
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
               </div>
             </div>
           </div>
@@ -2276,9 +2722,16 @@ const ContentHub = () => {
             </div>
           </div>
         </div>
+<<<<<<< HEAD
+=======
+      )}
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
     </div>
   );
 };
 
+<<<<<<< HEAD
 // Export the main component
+=======
+>>>>>>> 5ad9de13 (Initial commit: Content Management Hub with S3 integration)
 export default ContentHub;
