@@ -623,6 +623,11 @@ const ContentHub = () => {
         ? { ...project, status, lastActivity: 'Just now' }
         : project
     ));
+    
+    // Also update selectedProject if it's the one being updated
+    if (selectedProject && selectedProject.id === projectId) {
+      setSelectedProject(prev => prev ? { ...prev, status, lastActivity: 'Just now' } : null);
+    }
   };
 
   const deleteProject = (projectId: number) => {
@@ -1425,14 +1430,17 @@ const ContentHub = () => {
                   </div>
                 </div>
                 
-                {selectedProject.feedback && (
-                  <div>
-                    <span className="font-medium text-gray-700">Latest Feedback:</span>
+                {/* Feedback Section */}
+                <div>
+                  <span className="font-medium text-gray-700">Latest Feedback:</span>
+                  {selectedProject.feedback ? (
                     <div className="bg-gray-50 p-3 rounded-lg mt-1">
                       {selectedProject.feedback}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-gray-500 text-sm mt-1">No feedback yet</p>
+                  )}
+                </div>
                 
                 {/* Files Section */}
                 <div className="border-t pt-4">
