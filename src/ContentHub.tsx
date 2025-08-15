@@ -467,6 +467,22 @@ const ContentHub = () => {
 
   const uploadToS3 = async (file: File, key: string, fileName?: string): Promise<string> => {
     try {
+      // Debug S3 configuration
+      console.log('S3 Debug Info:', {
+        bucket: S3_BUCKET_NAME,
+        region: process.env.REACT_APP_AWS_REGION || 'us-east-1',
+        hasAccessKey: !!process.env.REACT_APP_AWS_ACCESS_KEY_ID,
+        hasSecretKey: !!process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
+        accessKeyLength: process.env.REACT_APP_AWS_ACCESS_KEY_ID?.length || 0,
+        key: key,
+        fileSize: file.size,
+        fileType: file.type
+      });
+
+      if (!process.env.REACT_APP_AWS_ACCESS_KEY_ID || !process.env.REACT_APP_AWS_SECRET_ACCESS_KEY) {
+        throw new Error('AWS credentials are missing. Please check your Vercel environment variables.');
+      }
+
       console.log('Uploading to S3:', key, 'Size:', file.size);
       
       // Update progress - converting file
@@ -489,7 +505,12 @@ const ContentHub = () => {
         ContentType: file.type,
       });
 
-      console.log('Sending to S3...');
+      console.log('Sending to S3 with command:', {
+        Bucket: S3_BUCKET_NAME,
+        Key: key,
+        ContentType: file.type,
+        BodySize: arrayBuffer.byteLength
+      });
       
       // Update progress - uploading
       if (fileName) {
@@ -508,7 +529,13 @@ const ContentHub = () => {
       
       return fileUrl;
     } catch (error) {
-      console.error('S3 upload error:', error);
+      console.error('S3 upload error details:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown',
+        code: (error as any)?.Code || 'No code',
+        statusCode: (error as any)?.$metadata?.httpStatusCode || 'No status code'
+      });
       throw new Error(`S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
