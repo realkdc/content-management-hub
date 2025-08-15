@@ -153,75 +153,7 @@ const ContentHub = () => {
     loadData();
   }, []);
 
-  // Keep old sample data as fallback (will be replaced by Supabase data)
-  // const sampleProjects = [
-    {
-      id: 1,
-      client: 'Green Wellness Co',
-      title: 'Instagram Reel - Product Launch',
-      type: 'video' as ContentType,
-      subtype: 'Instagram Reel',
-      status: 'pending_review' as ProjectStatus,
-      priority: 'high' as const,
-      version: 3,
-      dueDate: '2025-08-20',
-      estimatedHours: 8,
-      budget: 1500,
-      description: 'Create engaging Instagram Reel to promote new THCA product line',
-      objectives: 'Drive awareness and sales for new product launch',
-      targetAudience: 'Cannabis enthusiasts, 25-45 years old',
-      platforms: ['Instagram', 'TikTok'],
-      deliverables: '60-second vertical video with captions, 3 versions for A/B testing',
-      feedback: 'Need to adjust the intro timing',
-      lastActivity: '2 hours ago',
-      files: [],
-      tags: ['product-launch', 'thca', 'social-media']
-    },
-    {
-      id: 2,
-      client: 'Urban Dispensary',
-      title: 'TikTok Series - Educational Content',
-      type: 'video' as ContentType,
-      subtype: 'TikTok Series',
-      status: 'in_progress' as ProjectStatus,
-      priority: 'medium' as const,
-      version: 1,
-      dueDate: '2025-08-22',
-      estimatedHours: 12,
-      budget: 2000,
-      description: '5-part educational TikTok series about cannabis benefits',
-      objectives: 'Educate audience and build brand authority',
-      targetAudience: 'Cannabis curious consumers, 21-35 years old',
-      platforms: ['TikTok', 'Instagram Reels'],
-      deliverables: '5 educational videos, 60 seconds each, with engaging graphics',
-      feedback: null,
-      lastActivity: '1 day ago',
-      files: [],
-      tags: ['education', 'tiktok', 'series']
-    },
-    {
-      id: 3,
-      client: 'Hemp Collective',
-      title: 'Social Media Captions - Weekly Batch',
-      type: 'text' as ContentType,
-      subtype: 'Social Media Copy',
-      status: 'approved' as ProjectStatus,
-      priority: 'low' as const,
-      version: 2,
-      dueDate: '2025-08-18',
-      estimatedHours: 4,
-      budget: 500,
-      description: 'Weekly batch of social media captions for Instagram and Facebook',
-      objectives: 'Maintain consistent social media presence',
-      targetAudience: 'Existing customers and followers',
-      platforms: ['Instagram', 'Facebook'],
-      deliverables: '14 captions with hashtags and posting schedule',
-      feedback: 'Perfect, approved!',
-      lastActivity: '3 days ago',
-      files: [],
-      tags: ['captions', 'weekly', 'social-media']
-    }
-  // ]; // End sample projects (not used anymore)
+  // Sample projects are now loaded from Supabase database
 
   const [clients, setClients] = useState<Client[]>([]);
 
