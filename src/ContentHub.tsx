@@ -1,0 +1,1822 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock, CheckCircle, AlertCircle, X, Edit, Trash2, Eye, Download } from 'lucide-react';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+
+type ProjectStatus = 'approved' | 'pending_review' | 'in_progress' | 'needs_revision';
+type ContentType = 'video' | 'image' | 'text';
+
+interface Project {
+  id: number;
+  client: string;
+  title: string;
+  type: ContentType;
+  subtype?: string; // e.g., "Instagram Reel", "TikTok Video", "Blog Post"
+  status: ProjectStatus;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  version: number;
+  dueDate: string;
+  estimatedHours?: number;
+  budget?: number;
+  description: string;
+  objectives?: string; // What's the goal of this content?
+  targetAudience?: string;
+  platforms?: string[]; // Instagram, TikTok, etc.
+  deliverables?: string; // What exactly will be delivered
+  feedback: string | null;
+  lastActivity: string;
+  files?: ProjectFile[];
+  tags?: string[]; // Custom tags for better organization
+}
+
+interface ProjectFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  uploadDate: string;
+  url?: string;
+  s3Key?: string; // S3 object key for cloud storage
+}
+
+interface Client {
+  id: number;
+  name: string;
+  email: string;
+  company: string;
+  phone?: string;
+  projects: number[];
+  createdDate: string;
+}
+
+// S3 Configuration
+const s3Client = new S3Client({
+  region: process.env.REACT_APP_AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY || ''
+  }
+});
+
+const S3_BUCKET_NAME = process.env.REACT_APP_S3_BUCKET_NAME || 'content-management-hub';
+
+// Local Storage helpers
+const saveToLocalStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving to localStorage:', error);
+  }
+};
+
+const loadFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error('Error loading from localStorage:', error);
+    return defaultValue;
+  }
+};
+
+const ContentHub = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [projects, setProjects] = useState<Project[]>(() => 
+    loadFromLocalStorage('projects', [
+    {
+      id: 1,
+      client: 'Green Wellness Co',
+      title: 'Instagram Reel - Product Launch',
+      type: 'video' as ContentType,
+      subtype: 'Instagram Reel',
+      status: 'pending_review' as ProjectStatus,
+      priority: 'high' as const,
+      version: 3,
+      dueDate: '2025-08-20',
+      estimatedHours: 8,
+      budget: 1500,
+      description: 'Create engaging Instagram Reel to promote new THCA product line',
+      objectives: 'Drive awareness and sales for new product launch',
+      targetAudience: 'Cannabis enthusiasts, 25-45 years old',
+      platforms: ['Instagram', 'TikTok'],
+      deliverables: '60-second vertical video with captions, 3 versions for A/B testing',
+      feedback: 'Need to adjust the intro timing',
+      lastActivity: '2 hours ago',
+      files: [],
+      tags: ['product-launch', 'thca', 'social-media']
+    },
+    {
+      id: 2,
+      client: 'Urban Dispensary',
+      title: 'TikTok Series - Educational Content',
+      type: 'video' as ContentType,
+      subtype: 'TikTok Series',
+      status: 'in_progress' as ProjectStatus,
+      priority: 'medium' as const,
+      version: 1,
+      dueDate: '2025-08-22',
+      estimatedHours: 12,
+      budget: 2000,
+      description: '5-part educational TikTok series about cannabis benefits',
+      objectives: 'Educate audience and build brand authority',
+      targetAudience: 'Cannabis curious consumers, 21-35 years old',
+      platforms: ['TikTok', 'Instagram Reels'],
+      deliverables: '5 educational videos, 60 seconds each, with engaging graphics',
+      feedback: null,
+      lastActivity: '1 day ago',
+      files: [],
+      tags: ['education', 'tiktok', 'series']
+    },
+    {
+      id: 3,
+      client: 'Hemp Collective',
+      title: 'Social Media Captions - Weekly Batch',
+      type: 'text' as ContentType,
+      subtype: 'Social Media Copy',
+      status: 'approved' as ProjectStatus,
+      priority: 'low' as const,
+      version: 2,
+      dueDate: '2025-08-18',
+      estimatedHours: 4,
+      budget: 500,
+      description: 'Weekly batch of social media captions for Instagram and Facebook',
+      objectives: 'Maintain consistent social media presence',
+      targetAudience: 'Existing customers and followers',
+      platforms: ['Instagram', 'Facebook'],
+      deliverables: '14 captions with hashtags and posting schedule',
+      feedback: 'Perfect, approved!',
+      lastActivity: '3 days ago',
+      files: [],
+      tags: ['captions', 'weekly', 'social-media']
+    }
+    ])
+  );
+
+  const [clients, setClients] = useState<Client[]>(() =>
+    loadFromLocalStorage('clients', [
+      {
+        id: 1,
+        name: 'Sarah Johnson',
+        email: 'sarah@greenwellness.com',
+        company: 'Green Wellness Co',
+        phone: '+1 (555) 123-4567',
+        projects: [1],
+        createdDate: '2025-01-10'
+      },
+      {
+        id: 2,
+        name: 'Mike Chen',
+        email: 'mike@urbandispensary.com',
+        company: 'Urban Dispensary',
+        phone: '+1 (555) 987-6543',
+        projects: [2],
+        createdDate: '2025-01-15'
+      },
+      {
+        id: 3,
+        name: 'Lisa Rodriguez',
+        email: 'lisa@hempcollective.com',
+        company: 'Hemp Collective',
+        projects: [3],
+        createdDate: '2025-01-08'
+      }
+    ])
+  );
+
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'dueDate' | 'client' | 'status' | 'type'>('dueDate');
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [showEditClientModal, setShowEditClientModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [newProject, setNewProject] = useState<{
+    client: string;
+    title: string;
+    type: ContentType;
+    subtype: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    dueDate: string;
+    estimatedHours: number;
+    budget: number;
+    description: string;
+    objectives: string;
+    targetAudience: string;
+    platforms: string[];
+    deliverables: string;
+    tags: string[];
+  }>({
+    client: '',
+    title: '',
+    type: 'video',
+    subtype: '',
+    priority: 'medium',
+    dueDate: '',
+    estimatedHours: 0,
+    budget: 0,
+    description: '',
+    objectives: '',
+    targetAudience: '',
+    platforms: [],
+    deliverables: '',
+    tags: []
+  });
+  const [newClient, setNewClient] = useState<{ name: string; email: string; company: string; phone: string }>({
+    name: '',
+    email: '',
+    company: '',
+    phone: ''
+  });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    saveToLocalStorage('projects', projects);
+  }, [projects]);
+
+  useEffect(() => {
+    saveToLocalStorage('clients', clients);
+  }, [clients]);
+
+  const getStatusColor = (status: ProjectStatus) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'pending_review': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'needs_revision': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: ProjectStatus) => {
+    switch (status) {
+      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'pending_review': return <Clock className="w-4 h-4 text-yellow-600" />;
+      case 'in_progress': return <AlertCircle className="w-4 h-4 text-blue-600" />;
+      case 'needs_revision': return <AlertCircle className="w-4 h-4 text-red-600" />;
+      default: return <Clock className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getTypeIcon = (type: ContentType) => {
+    switch (type) {
+      case 'video': return <Video className="w-4 h-4" />;
+      case 'image': return <Image className="w-4 h-4" />;
+      case 'text': return <FileText className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const getTypeLabel = (type: ContentType) => {
+    switch (type) {
+      case 'video': return 'Video Content';
+      case 'image': return 'Image Content';
+      case 'text': return 'Text/Captions';
+      default: return type;
+    }
+  };
+
+  const getFilteredAndSortedProjects = () => {
+    let filtered = projects;
+
+    // Filter by type
+    if (filterType !== 'all') {
+      filtered = filtered.filter(project => project.type === filterType);
+    }
+
+    // Filter by status
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(project => project.status === filterStatus);
+    }
+
+    // Sort projects
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'dueDate':
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        case 'client':
+          return a.client.localeCompare(b.client);
+        case 'status':
+          return a.status.localeCompare(b.status);
+        case 'type':
+          return a.type.localeCompare(b.type);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  // Calculate real dashboard statistics
+  const getDashboardStats = () => {
+    const totalProjects = projects.length;
+    const pendingReview = projects.filter(p => p.status === 'pending_review').length;
+    const completedThisMonth = projects.filter(p => {
+      const projectDate = new Date(p.dueDate);
+      const currentDate = new Date();
+      return p.status === 'approved' && 
+             projectDate.getMonth() === currentDate.getMonth() && 
+             projectDate.getFullYear() === currentDate.getFullYear();
+    }).length;
+    const activeClients = clients.length;
+
+    return {
+      totalProjects,
+      pendingReview,
+      completedThisMonth,
+      activeClients
+    };
+  };
+
+
+
+  const handleNewProject = () => {
+    setShowNewProjectModal(true);
+  };
+
+  const uploadToS3 = async (file: File, key: string, fileName?: string): Promise<string> => {
+    try {
+      console.log('Uploading to S3:', key, 'Size:', file.size);
+      
+      // Update progress - converting file
+      if (fileName) {
+        setUploadProgress(prev => ({...prev, [fileName]: 25}));
+      }
+      
+      // Convert file to ArrayBuffer for better compatibility
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Update progress - preparing upload
+      if (fileName) {
+        setUploadProgress(prev => ({...prev, [fileName]: 50}));
+      }
+      
+      const command = new PutObjectCommand({
+        Bucket: S3_BUCKET_NAME,
+        Key: key,
+        Body: new Uint8Array(arrayBuffer),
+        ContentType: file.type,
+      });
+
+      console.log('Sending to S3...');
+      
+      // Update progress - uploading
+      if (fileName) {
+        setUploadProgress(prev => ({...prev, [fileName]: 75}));
+      }
+      
+      await s3Client.send(command);
+      
+      // Update progress - complete
+      if (fileName) {
+        setUploadProgress(prev => ({...prev, [fileName]: 100}));
+      }
+      
+      const fileUrl = `https://${S3_BUCKET_NAME}.s3.${process.env.REACT_APP_AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
+      console.log('Upload successful:', fileUrl);
+      
+      return fileUrl;
+    } catch (error) {
+      console.error('S3 upload error:', error);
+      throw new Error(`S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleFileUpload = async (projectId: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    console.log('Starting file upload...', files.length, 'files');
+    setIsUploading(true);
+    
+    // Initialize progress tracking
+    const fileNames = Array.from(files).map(file => file.name);
+    setUploadingFiles(fileNames);
+    const initialProgress: {[key: string]: number} = {};
+    fileNames.forEach(name => initialProgress[name] = 0);
+    setUploadProgress(initialProgress);
+    
+    const newFiles: ProjectFile[] = [];
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const s3Key = `projects/${projectId}/${fileId}-${file.name}`;
+        
+        // S3 upload only - no fallback to local storage
+        if (!process.env.REACT_APP_AWS_ACCESS_KEY_ID || !process.env.REACT_APP_AWS_SECRET_ACCESS_KEY) {
+          throw new Error('AWS credentials not configured. Please set up your .env file with valid AWS credentials.');
+        }
+        
+        // Update progress to show starting upload
+        setUploadProgress(prev => ({...prev, [file.name]: 10}));
+        
+        const fileUrl = await uploadToS3(file, s3Key, file.name);
+        
+        const newFile: ProjectFile = {
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          uploadDate: new Date().toISOString(),
+          url: fileUrl,
+          s3Key: s3Key
+        };
+        
+        newFiles.push(newFile);
+      }
+
+      // Update the project with new files
+      setProjects(prev => prev.map(project => 
+        project.id === projectId 
+          ? { 
+              ...project, 
+              files: [...(project.files || []), ...newFiles],
+              lastActivity: `${newFiles.length} file${newFiles.length > 1 ? 's' : ''} uploaded`
+            }
+          : project
+      ));
+
+      // Update selected project if it's the one being updated
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject(prev => prev ? {
+          ...prev,
+          files: [...(prev.files || []), ...newFiles],
+          lastActivity: `${newFiles.length} file${newFiles.length > 1 ? 's' : ''} uploaded`
+        } : null);
+      }
+
+      // Show success message
+      alert(`Successfully uploaded ${newFiles.length} file${newFiles.length > 1 ? 's' : ''} to S3 cloud storage!`);
+      
+    } catch (error) {
+      console.error('S3 upload error:', error);
+      alert(`S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}. Check your AWS credentials and try again.`);
+    } finally {
+      // Reset upload state
+      setIsUploading(false);
+      setUploadingFiles([]);
+      setUploadProgress({});
+    }
+  };
+
+  const deleteFromS3 = async (s3Key: string) => {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: S3_BUCKET_NAME,
+        Key: s3Key,
+      });
+      await s3Client.send(command);
+    } catch (error) {
+      console.error('S3 delete error:', error);
+    }
+  };
+
+  const deleteFile = async (projectId: number, fileId: string) => {
+    // Find the file to clean up
+    const project = projects.find(p => p.id === projectId);
+    const fileToDelete = project?.files?.find(f => f.id === fileId);
+    
+    if (fileToDelete && fileToDelete.s3Key) {
+      // Delete from S3 - all files should have s3Key now
+      try {
+        await deleteFromS3(fileToDelete.s3Key);
+      } catch (error) {
+        console.error('Failed to delete from S3:', error);
+        alert('Failed to delete file from S3. Please try again.');
+        return; // Don't update UI if S3 delete failed
+      }
+    }
+
+    // Update projects state
+    setProjects(prev => prev.map(project => 
+      project.id === projectId 
+        ? { 
+            ...project, 
+            files: project.files?.filter(f => f.id !== fileId) || [],
+            lastActivity: 'File deleted'
+          }
+        : project
+    ));
+
+    // Update selected project if it's the one being updated
+    if (selectedProject && selectedProject.id === projectId) {
+      setSelectedProject(prev => prev ? {
+        ...prev,
+        files: prev.files?.filter(f => f.id !== fileId) || [],
+        lastActivity: 'File deleted'
+      } : null);
+    }
+  };
+
+  const updateProjectStatus = (projectId: number, status: ProjectStatus) => {
+    setProjects(prev => prev.map(project => 
+      project.id === projectId 
+        ? { ...project, status, lastActivity: 'Just now' }
+        : project
+    ));
+  };
+
+  const deleteProject = (projectId: number) => {
+    setProjects(prev => prev.filter(project => project.id !== projectId));
+    if (selectedProject?.id === projectId) {
+      setSelectedProject(null);
+    }
+  };
+
+  const saveNewClient = () => {
+    if (!newClient.name || !newClient.email || !newClient.company) return;
+    
+    const client: Client = {
+      id: clients.length + 1,
+      name: newClient.name,
+      email: newClient.email,
+      company: newClient.company,
+      phone: newClient.phone,
+      projects: [],
+      createdDate: new Date().toISOString().split('T')[0]
+    };
+    
+    setClients([...clients, client]);
+    setNewClient({ name: '', email: '', company: '', phone: '' });
+    setShowNewClientModal(false);
+  };
+
+  const deleteClient = (clientId: number) => {
+    setClients(prev => prev.filter(client => client.id !== clientId));
+  };
+
+  const editClient = (client: Client) => {
+    setSelectedClient(client);
+    setNewClient({
+      name: client.name,
+      email: client.email,
+      company: client.company,
+      phone: client.phone || ''
+    });
+    setShowEditClientModal(true);
+  };
+
+  const updateClient = () => {
+    if (!selectedClient || !newClient.name || !newClient.email || !newClient.company) return;
+    
+    setClients(prev => prev.map(client => 
+      client.id === selectedClient.id 
+        ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
+        : client
+    ));
+    
+    setNewClient({ name: '', email: '', company: '', phone: '' });
+    setSelectedClient(null);
+    setShowEditClientModal(false);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent, projectId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await handleFileUpload(projectId, files);
+    }
+  };
+
+  const downloadAllFilesAsZip = async (project: Project) => {
+    if (!project.files || project.files.length === 0) {
+      alert('No files to download in this project.');
+      return;
+    }
+
+    try {
+      const zip = new JSZip();
+      const projectFolder = zip.folder(`${project.client} - ${project.title}`);
+      
+      // Create a loading indicator
+      const loadingMessage = `Preparing ${project.files.length} files for download...`;
+      console.log(loadingMessage);
+
+      for (let i = 0; i < project.files.length; i++) {
+        const file = project.files[i];
+        
+        try {
+          // Fetch the file content
+          const response = await fetch(file.url!);
+          if (response.ok) {
+            const blob = await response.blob();
+            
+            // Add file to ZIP with organized naming
+            const fileName = `${i + 1}_${file.name}`;
+            projectFolder?.file(fileName, blob);
+          } else {
+            console.warn(`Failed to download file: ${file.name}`);
+          }
+        } catch (error) {
+          console.warn(`Error downloading file ${file.name}:`, error);
+        }
+      }
+
+      // Generate and download the ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipFileName = `${project.client.replace(/[^a-zA-Z0-9]/g, '_')}_${project.title.replace(/[^a-zA-Z0-9]/g, '_')}_Files.zip`;
+      
+      saveAs(zipBlob, zipFileName);
+      alert(`Successfully downloaded ${project.files.length} files as ${zipFileName}!`);
+      
+    } catch (error) {
+      console.error('Error creating ZIP file:', error);
+      alert('Error creating ZIP file. Please try again.');
+    }
+  };
+
+  const saveNewProject = () => {
+    if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) return;
+    
+    const project: Project = {
+      id: projects.length + 1,
+      client: newProject.client,
+      title: newProject.title,
+      type: newProject.type,
+      subtype: newProject.subtype,
+      priority: newProject.priority,
+      status: 'in_progress' as ProjectStatus,
+      version: 1,
+      dueDate: newProject.dueDate,
+      estimatedHours: newProject.estimatedHours,
+      budget: newProject.budget,
+      description: newProject.description,
+      objectives: newProject.objectives,
+      targetAudience: newProject.targetAudience,
+      platforms: newProject.platforms,
+      deliverables: newProject.deliverables,
+      feedback: null,
+      lastActivity: 'Just created',
+      files: [],
+      tags: newProject.tags
+    };
+    
+    // Update client's project list
+    setClients(prev => prev.map(client => 
+      client.company === newProject.client || client.name === newProject.client
+        ? { ...client, projects: [...client.projects, project.id] }
+        : client
+    ));
+    
+    setProjects([...projects, project]);
+    setNewProject({
+      client: '',
+      title: '',
+      type: 'video',
+      subtype: '',
+      priority: 'medium',
+      dueDate: '',
+      estimatedHours: 0,
+      budget: 0,
+      description: '',
+      objectives: '',
+      targetAudience: '',
+      platforms: [],
+      deliverables: '',
+      tags: []
+    });
+    setShowNewProjectModal(false);
+  };
+
+
+
+  const ProjectCard: React.FC<{ project: Project }> = ({ project }) => (
+    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-1">
+            {getTypeIcon(project.type)}
+            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+              {getTypeLabel(project.type)}
+            </span>
+          </div>
+          <h3 className="font-medium text-gray-900">{project.title}</h3>
+        </div>
+        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+          <div className="flex items-center space-x-1">
+            {getStatusIcon(project.status)}
+            <span>{project.status.replace('_', ' ')}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="space-y-2 text-sm text-gray-600">
+        <div className="flex items-center space-x-2">
+          <User className="w-4 h-4" />
+          <span>{project.client}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Version {project.version}</span>
+          <span>Due: {project.dueDate}</span>
+        </div>
+        {project.feedback && (
+          <div className="bg-gray-50 p-2 rounded text-xs">
+            <strong>Latest feedback:</strong> {project.feedback}
+          </div>
+        )}
+        <div className="text-xs text-gray-400">
+          {project.lastActivity}
+        </div>
+      </div>
+      
+      <div className="mt-3 flex space-x-2">
+        <button 
+          onClick={() => setSelectedProject(project)}
+          className="flex-1 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
+        >
+          <Eye className="w-3 h-3" />
+          <span>View</span>
+        </button>
+        <button 
+          onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'pending_review' : 'approved')}
+          className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
+          title="Toggle Status"
+        >
+          <CheckCircle className="w-4 h-4" />
+        </button>
+        <button 
+          onClick={() => deleteProject(project.id)}
+          className="px-3 py-1 border border-red-300 rounded text-sm hover:bg-red-50 transition-colors text-red-600"
+          title="Delete Project"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <h1 className="text-2xl font-bold text-gray-900">Content Hub</h1>
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={() => {
+                  if (projects.length === 0) {
+                    alert('Please create a project first before uploading files.');
+                    return;
+                  }
+                  
+                  if (selectedProject) {
+                    fileInputRef.current?.click();
+                  } else {
+                    // Show project selector
+                    const projectNames = projects.map((p, i) => `${i + 1}. ${p.title} (${p.client})`).join('\n');
+                    const choice = prompt(`Select a project to upload files to:\n\n${projectNames}\n\nEnter the project number (1-${projects.length}):`);
+                    
+                    if (choice) {
+                      const projectIndex = parseInt(choice) - 1;
+                      if (projectIndex >= 0 && projectIndex < projects.length) {
+                        setSelectedProject(projects[projectIndex]);
+                        setTimeout(() => fileInputRef.current?.click(), 100);
+                      } else {
+                        alert('Invalid project number.');
+                      }
+                    }
+                  }
+                }}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload Files</span>
+              </button>
+              <button 
+                onClick={handleNewProject}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Project</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="video/*,image/*,text/*,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.mp4,.mov,.avi"
+                className="hidden"
+                onChange={async (e) => {
+                  if (selectedProject && e.target.files) {
+                    await handleFileUpload(selectedProject.id, e.target.files);
+                    // Reset the input so the same file can be uploaded again if needed
+                    e.target.value = '';
+                  } else {
+                    alert('Please select a project first to upload files.');
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Navigation Tabs */}
+        <nav className="flex space-x-8 mb-8">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+            { id: 'projects', label: 'All Projects', icon: FileText },
+            { id: 'calendar', label: 'Calendar', icon: Calendar },
+            { id: 'clients', label: 'Clients', icon: User }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center space-x-2 pb-2 border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+
+
+
+        {/* Main Content */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-lg border">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 rounded">
+                    <FileText className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().totalProjects}</p>
+                    <p className="text-gray-600">Total Projects</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-6 rounded-lg border">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded">
+                    <Clock className="w-6 h-6 text-yellow-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().pendingReview}</p>
+                    <p className="text-gray-600">Pending Review</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-6 rounded-lg border">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 rounded">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().completedThisMonth}</p>
+                    <p className="text-gray-600">Completed This Month</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white p-6 rounded-lg border">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-100 rounded">
+                    <User className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().activeClients}</p>
+                    <p className="text-gray-600">Active Clients</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Projects */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Projects</h2>
+                <div className="flex items-center space-x-4">
+                  {/* Content Type Filter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Type:</label>
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value as ContentType | 'all')}
+                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="video">🎥 Video Content</option>
+                      <option value="image">🖼️ Image Content</option>
+                      <option value="text">📝 Text/Captions</option>
+                    </select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
+                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="in_progress">🔄 In Progress</option>
+                      <option value="pending_review">⏳ Pending Review</option>
+                      <option value="needs_revision">🔧 Needs Revision</option>
+                      <option value="approved">✅ Approved</option>
+                    </select>
+                  </div>
+
+                  {/* Sort By */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Sort:</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'dueDate' | 'client' | 'status' | 'type')}
+                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="dueDate">📅 Due Date</option>
+                      <option value="client">👤 Client</option>
+                      <option value="type">🎯 Content Type</option>
+                      <option value="status">📊 Status</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getFilteredAndSortedProjects().map((project) => (
+                  <ProjectCard key={project.id} project={project} />
+                ))}
+                {getFilteredAndSortedProjects().length === 0 && (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    No projects match your current filters.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'projects' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">All Projects</h2>
+              <div className="flex items-center space-x-4">
+                {/* Content Type Filter */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Type:</label>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as ContentType | 'all')}
+                    className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="video">🎥 Video Content</option>
+                    <option value="image">🖼️ Image Content</option>
+                    <option value="text">📝 Text/Captions</option>
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Status:</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
+                    className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="in_progress">🔄 In Progress</option>
+                    <option value="pending_review">⏳ Pending Review</option>
+                    <option value="needs_revision">🔧 Needs Revision</option>
+                    <option value="approved">✅ Approved</option>
+                  </select>
+                </div>
+
+                {/* Sort By */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Sort:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'dueDate' | 'client' | 'status' | 'type')}
+                    className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="dueDate">📅 Due Date</option>
+                    <option value="client">👤 Client</option>
+                    <option value="type">🎯 Content Type</option>
+                    <option value="status">📊 Status</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getFilteredAndSortedProjects().map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+              {getFilteredAndSortedProjects().length === 0 && (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  No projects match your current filters.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'calendar' && (
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Content Calendar</h2>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-gray-700">Upcoming Deadlines</h3>
+                <span className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+              </div>
+              
+              <div className="space-y-3">
+                {projects
+                  .filter(project => new Date(project.dueDate) >= new Date())
+                  .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                  .map((project) => {
+                    const daysUntilDue = Math.ceil((new Date(project.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    const isUrgent = daysUntilDue <= 3;
+                    const isOverdue = daysUntilDue < 0;
+                    
+                    return (
+                      <div key={project.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                        isOverdue ? 'bg-red-50 border-red-200' : 
+                        isUrgent ? 'bg-yellow-50 border-yellow-200' : 
+                        'bg-gray-50 border-gray-200'
+                      }`}>
+                        <div className="flex items-center space-x-3">
+                          {getTypeIcon(project.type)}
+                          <div>
+                            <p className="font-medium text-gray-900">{project.title}</p>
+                            <p className="text-sm text-gray-600">{project.client}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+                            {project.status.replace('_', ' ')}
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-sm font-medium ${
+                              isOverdue ? 'text-red-600' : 
+                              isUrgent ? 'text-yellow-600' : 
+                              'text-gray-900'
+                            }`}>
+                              {new Date(project.dueDate).toLocaleDateString()}
+                            </p>
+                            <p className={`text-xs ${
+                              isOverdue ? 'text-red-500' : 
+                              isUrgent ? 'text-yellow-500' : 
+                              'text-gray-500'
+                            }`}>
+                              {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : 
+                               daysUntilDue === 0 ? 'Due today' :
+                               `${daysUntilDue} days left`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                
+                {projects.filter(project => new Date(project.dueDate) >= new Date()).length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No upcoming deadlines</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Client Management</h2>
+              <button 
+                onClick={() => setShowNewClientModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Client</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {clients.map((client) => (
+                <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-medium text-gray-900">{client.name}</h3>
+                    </div>
+                    <div className="flex space-x-1">
+                      <button 
+                        onClick={() => editClient(client)}
+                        className="p-1 text-gray-400 hover:text-blue-600"
+                        title="Edit client"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => deleteClient(client.id)}
+                        className="p-1 text-gray-400 hover:text-red-600"
+                        title="Delete client"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">Company:</span>
+                      <span>{client.company}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">Email:</span>
+                      <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">
+                        {client.email}
+                      </a>
+                    </div>
+                    {client.phone && (
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">Phone:</span>
+                        <a href={`tel:${client.phone}`} className="text-blue-600 hover:underline">
+                          {client.phone}
+                        </a>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-xs text-gray-400">
+                        {client.projects.length} project{client.projects.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        Since {new Date(client.createdDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Project Detail Modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">{selectedProject.title}</h2>
+                <button
+                  onClick={() => setSelectedProject(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Client:</span>
+                    <p>{selectedProject.client}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Due Date:</span>
+                    <p>{selectedProject.dueDate}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Version:</span>
+                    <p>{selectedProject.version}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Status:</span>
+                    <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedProject.status)}`}>
+                      {selectedProject.status.replace('_', ' ')}
+                    </div>
+                  </div>
+                </div>
+                
+                {selectedProject.feedback && (
+                  <div>
+                    <span className="font-medium text-gray-700">Latest Feedback:</span>
+                    <div className="bg-gray-50 p-3 rounded-lg mt-1">
+                      {selectedProject.feedback}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Files Section */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-gray-700">Project Files ({selectedProject.files?.length || 0})</h3>
+                    <div className="flex space-x-2">
+                      <input
+                        type="file"
+                        multiple
+                        accept="video/*,image/*,text/*,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.mp4,.mov,.avi"
+                        className="hidden"
+                        id={`file-upload-${selectedProject.id}`}
+                        onChange={async (e) => {
+                          await handleFileUpload(selectedProject.id, e.target.files);
+                          // Reset the input so the same files can be uploaded again if needed
+                          e.target.value = '';
+                        }}
+                      />
+                      {selectedProject.files && selectedProject.files.length > 0 && (
+                                              <button 
+                        onClick={() => downloadAllFilesAsZip(selectedProject)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center space-x-1"
+                        title="Download all files as ZIP"
+                        disabled={isUploading}
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download ZIP</span>
+                      </button>
+                      )}
+                      <button 
+                        onClick={() => document.getElementById(`file-upload-${selectedProject.id}`)?.click()}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-1"
+                        disabled={isUploading}
+                      >
+                        <Upload className="w-3 h-3" />
+                        <span>{isUploading ? 'Uploading...' : 'Add Files'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                                    {selectedProject.files && selectedProject.files.length > 0 ? (
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {selectedProject.files.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div className="flex items-center space-x-2 flex-1">
+                            {file.type.startsWith('image/') ? <Image className="w-4 h-4" /> : 
+                             file.type.startsWith('video/') ? <Video className="w-4 h-4" /> : 
+                             <FileText className="w-4 h-4" />}
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                              <p className="text-xs text-gray-500">{formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            {file.url && (
+                              <a 
+                                href={file.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 p-1"
+                                title="View file"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </a>
+                            )}
+                            <button 
+                              onClick={() => deleteFile(selectedProject.id, file.id)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                              title="Delete file"
+                            >
+                              <X className="w-3 h-3" />
+                    </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div 
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors"
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, selectedProject.id)}
+                    >
+                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 mb-2">No files uploaded yet</p>
+                      <p className="text-xs text-gray-400">Drag and drop files here or click "Add Files" button</p>
+                    </div>
+                  )}
+
+                  {/* Upload Progress */}
+                  {isUploading && uploadingFiles.length > 0 && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center mb-3">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2"></div>
+                        <h4 className="font-medium text-blue-900">
+                          Uploading {uploadingFiles.length} file{uploadingFiles.length > 1 ? 's' : ''}...
+                        </h4>
+                      </div>
+                      <div className="space-y-2">
+                        {uploadingFiles.map((fileName) => (
+                          <div key={fileName} className="bg-white rounded p-3 border border-blue-100">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-700 truncate">{fileName}</span>
+                              <span className="text-xs text-blue-600 font-medium">{uploadProgress[fileName] || 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${uploadProgress[fileName] || 0}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-medium text-gray-700 mb-2">Actions</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <select 
+                      value={selectedProject.status} 
+                      onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
+                      className="border border-gray-300 px-3 py-2 rounded text-sm"
+                    >
+                      <option value="in_progress">In Progress</option>
+                      <option value="pending_review">Pending Review</option>
+                      <option value="needs_revision">Needs Revision</option>
+                      <option value="approved">Approved</option>
+                    </select>
+                    <button 
+                      onClick={() => deleteProject(selectedProject.id)}
+                      className="border border-red-300 text-red-600 px-4 py-2 rounded hover:bg-red-50 text-sm flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Delete Project</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Project Modal - Enhanced */}
+      {showNewProjectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Create New Project</h2>
+                <button
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column - Basic Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Basic Information</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client *
+                    </label>
+                    <select
+                      value={newProject.client}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select a client...</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.company}>
+                          {client.company} ({client.name})
+                        </option>
+                      ))}
+                    </select>
+                    {clients.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        No clients found. <button 
+                          onClick={() => {setShowNewProjectModal(false); setShowNewClientModal(true);}}
+                          className="text-blue-600 hover:underline"
+                        >
+                          Add a client first
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.title}
+                      onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Instagram Reel - Product Launch"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Type *
+                      </label>
+                      <select
+                        value={newProject.type}
+                        onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="video">🎥 Video</option>
+                        <option value="image">🖼️ Image</option>
+                        <option value="text">📝 Text/Copy</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subtype
+                      </label>
+                      <input
+                        type="text"
+                        value={newProject.subtype}
+                        onChange={(e) => setNewProject({...newProject, subtype: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Instagram Reel, Blog Post, etc."
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={newProject.priority}
+                        onChange={(e) => setNewProject({...newProject, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent'})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="low">🟢 Low</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="high">🟠 High</option>
+                        <option value="urgent">🔴 Urgent</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={newProject.dueDate}
+                        onChange={(e) => setNewProject({...newProject, dueDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Estimated Hours
+                      </label>
+                      <input
+                        type="number"
+                        value={newProject.estimatedHours}
+                        onChange={(e) => setNewProject({...newProject, estimatedHours: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Budget ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={newProject.budget}
+                        onChange={(e) => setNewProject({...newProject, budget: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Detailed Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Project Details</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description *
+                    </label>
+                    <textarea
+                      value={newProject.description}
+                      onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                      placeholder="Brief description of the project..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Objectives/Goals
+                    </label>
+                    <textarea
+                      value={newProject.objectives}
+                      onChange={(e) => setNewProject({...newProject, objectives: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="What's the goal? Drive sales, increase awareness, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Target Audience
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.targetAudience}
+                      onChange={(e) => setNewProject({...newProject, targetAudience: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Cannabis enthusiasts, 25-45 years old"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Platforms
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'LinkedIn'].map((platform) => (
+                        <label key={platform} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={newProject.platforms.includes(platform)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewProject({...newProject, platforms: [...newProject.platforms, platform]});
+                              } else {
+                                setNewProject({...newProject, platforms: newProject.platforms.filter(p => p !== platform)});
+                              }
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{platform}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Deliverables
+                    </label>
+                    <textarea
+                      value={newProject.deliverables}
+                      onChange={(e) => setNewProject({...newProject, deliverables: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="What exactly will be delivered? e.g., 3 video versions, captions, thumbnails"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.tags.join(', ')}
+                      onChange={(e) => setNewProject({...newProject, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., product-launch, thca, social-media (comma separated)"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+                <button
+                  onClick={() => setShowNewProjectModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewProject}
+                  disabled={!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Create Project
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Client Modal */}
+      {showNewClientModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Add New Client</h2>
+                <button
+                  onClick={() => setShowNewClientModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Client Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClient.name}
+                    onChange={(e) => setNewClient({...newClient, name: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Sarah Johnson"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({...newClient, email: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="sarah@company.com"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClient.company}
+                    onChange={(e) => setNewClient({...newClient, company: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., Green Wellness Co"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({...newClient, phone: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={saveNewClient}
+                    disabled={!newClient.name || !newClient.email || !newClient.company}
+                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    Add Client
+                  </button>
+                  <button
+                    onClick={() => setShowNewClientModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {showEditClientModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Edit Client</h2>
+                <button
+                  onClick={() => setShowEditClientModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Client Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClient.name}
+                    onChange={(e) => setNewClient({...newClient, name: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({...newClient, email: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClient.company}
+                    onChange={(e) => setNewClient({...newClient, company: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({...newClient, phone: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={updateClient}
+                    disabled={!newClient.name || !newClient.email || !newClient.company}
+                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    Update Client
+                  </button>
+                  <button
+                    onClick={() => setShowEditClientModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ContentHub;
