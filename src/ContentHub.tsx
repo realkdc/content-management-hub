@@ -711,6 +711,32 @@ const ContentHub = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const formatLastActivity = (lastActivity: string) => {
+    // If it's already a user-friendly message, return as is
+    if (!lastActivity.includes('T') || !lastActivity.includes('Z')) {
+      return lastActivity;
+    }
+    
+    // If it's a timestamp, format it nicely
+    try {
+      const date = new Date(lastActivity);
+      const now = new Date();
+      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+      
+      if (diffInHours < 1) {
+        return 'Just now';
+      } else if (diffInHours < 24) {
+        const hours = Math.floor(diffInHours);
+        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      } else {
+        const days = Math.floor(diffInHours / 24);
+        return `${days} day${days > 1 ? 's' : ''} ago`;
+      }
+    } catch (error) {
+      return 'Recently updated';
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -900,7 +926,7 @@ const ContentHub = () => {
           </div>
         )}
         <div className="text-xs text-gray-400">
-          {project.lastActivity}
+          {formatLastActivity(project.lastActivity)}
         </div>
       </div>
       
