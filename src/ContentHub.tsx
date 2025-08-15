@@ -7,7 +7,7 @@ import { supabase, DatabaseProject, DatabaseClient } from './supabaseClient';
 
 type ProjectStatus = 'draft' | 'editor_review' | 'client_review' | 'needs_revision' | 'approved' | 'final_delivered';
 type ContentType = 'video' | 'image' | 'text';
-type UserRole = 'admin' | 'editor' | 'client';
+
 
 interface Project {
   id: number;
@@ -273,19 +273,7 @@ const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> =>
   }
 };
 
-const deleteFileFromSupabase = async (fileId: number): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('project_files')
-      .delete()
-      .eq('id', fileId);
-    
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error deleting file record:', error);
-    throw error;
-  }
-};
+
 
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -324,11 +312,10 @@ const ContentHub = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
-  const [currentUser, setCurrentUser] = useState({
+  const currentUser = {
     name: 'Admin User', // In real app, this would come from authentication
-    role: 'admin' as UserRole,
     email: 'admin@example.com'
-  });
+  };
   const [newProject, setNewProject] = useState<{
     client: string;
     title: string;
@@ -564,10 +551,7 @@ const ContentHub = () => {
         // Generate version number
         const version = getNextVersion(existingFiles, file.name);
         
-        // Mark all previous versions of this file as not latest
-        const updatedExistingFiles = existingFiles.map(f => 
-          f.name === file.name ? { ...f, isLatest: false } : f
-        );
+
 
         const newFile: ProjectFile = {
           id: fileId,
@@ -860,12 +844,7 @@ const ContentHub = () => {
     return workflow[currentStatus];
   };
 
-  const canUserEditProject = (userRole: UserRole, projectStatus: ProjectStatus): boolean => {
-    if (userRole === 'admin') return true;
-    if (userRole === 'editor') return ['draft', 'needs_revision', 'editor_review'].includes(projectStatus);
-    if (userRole === 'client') return ['client_review'].includes(projectStatus);
-    return false;
-  };
+
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
