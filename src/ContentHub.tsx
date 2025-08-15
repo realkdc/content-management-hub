@@ -133,6 +133,69 @@ const loadClientsFromSupabase = async (): Promise<Client[]> => {
   }
 };
 
+const saveClientToSupabase = async (client: Omit<Client, 'id' | 'createdDate'>): Promise<Client> => {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert([{
+        name: client.name,
+        email: client.email,
+        company: client.company,
+        phone: client.phone
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      company: data.company,
+      phone: data.phone,
+      projects: [],
+      createdDate: data.created_date
+    };
+  } catch (error) {
+    console.error('Error saving client:', error);
+    throw error;
+  }
+};
+
+const updateClientInSupabase = async (clientId: number, updates: Partial<Client>): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        name: updates.name,
+        email: updates.email,
+        company: updates.company,
+        phone: updates.phone
+      })
+      .eq('id', clientId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating client:', error);
+    throw error;
+  }
+};
+
+const deleteClientFromSupabase = async (clientId: number): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    throw error;
+  }
+};
+
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -503,26 +566,37 @@ const ContentHub = () => {
     }
   };
 
-  const saveNewClient = () => {
+  const saveNewClient = async () => {
     if (!newClient.name || !newClient.email || !newClient.company) return;
     
-    const client: Client = {
-      id: clients.length + 1,
-      name: newClient.name,
-      email: newClient.email,
-      company: newClient.company,
-      phone: newClient.phone,
-      projects: [],
-      createdDate: new Date().toISOString().split('T')[0]
-    };
-    
-    setClients([...clients, client]);
-    setNewClient({ name: '', email: '', company: '', phone: '' });
-    setShowNewClientModal(false);
+    try {
+      const client = await saveClientToSupabase({
+        name: newClient.name,
+        email: newClient.email,
+        company: newClient.company,
+        phone: newClient.phone,
+        projects: []
+      });
+      
+      setClients([...clients, client]);
+      setNewClient({ name: '', email: '', company: '', phone: '' });
+      setShowNewClientModal(false);
+      alert('Client added successfully!');
+    } catch (error) {
+      console.error('Failed to save client:', error);
+      alert('Failed to add client. Please try again.');
+    }
   };
 
-  const deleteClient = (clientId: number) => {
-    setClients(prev => prev.filter(client => client.id !== clientId));
+  const deleteClient = async (clientId: number) => {
+    try {
+      await deleteClientFromSupabase(clientId);
+      setClients(prev => prev.filter(client => client.id !== clientId));
+      alert('Client deleted successfully!');
+    } catch (error) {
+      console.error('Failed to delete client:', error);
+      alert('Failed to delete client. Please try again.');
+    }
   };
 
   const editClient = (client: Client) => {
@@ -536,18 +610,31 @@ const ContentHub = () => {
     setShowEditClientModal(true);
   };
 
-  const updateClient = () => {
+  const updateClient = async () => {
     if (!selectedClient || !newClient.name || !newClient.email || !newClient.company) return;
     
-    setClients(prev => prev.map(client => 
-      client.id === selectedClient.id 
-        ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
-        : client
-    ));
-    
-    setNewClient({ name: '', email: '', company: '', phone: '' });
-    setSelectedClient(null);
-    setShowEditClientModal(false);
+    try {
+      await updateClientInSupabase(selectedClient.id, {
+        name: newClient.name,
+        email: newClient.email,
+        company: newClient.company,
+        phone: newClient.phone
+      });
+      
+      setClients(prev => prev.map(client => 
+        client.id === selectedClient.id 
+          ? { ...client, name: newClient.name, email: newClient.email, company: newClient.company, phone: newClient.phone }
+          : client
+      ));
+      
+      setNewClient({ name: '', email: '', company: '', phone: '' });
+      setSelectedClient(null);
+      setShowEditClientModal(false);
+      alert('Client updated successfully!');
+    } catch (error) {
+      console.error('Failed to update client:', error);
+      alert('Failed to update client. Please try again.');
+    }
   };
 
   const formatFileSize = (bytes: number) => {
