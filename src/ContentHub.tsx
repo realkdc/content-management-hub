@@ -574,7 +574,7 @@ const ContentHub = () => {
           name: file.name,
           size: file.size,
           type: file.type,
-          uploadDate: new Date().toISOString(),
+          uploadDate: new Date().toDateString(),
           url: fileUrl,
           s3Key: s3Key,
           version: version,
@@ -808,29 +808,8 @@ const ContentHub = () => {
   };
 
   const formatLastActivity = (lastActivity: string) => {
-    // If it's already a user-friendly message, return as is
-    if (!lastActivity.includes('T') || !lastActivity.includes('Z')) {
-      return lastActivity;
-    }
-    
-    // If it's a timestamp, format it nicely
-    try {
-      const date = new Date(lastActivity);
-      const now = new Date();
-      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-      
-      if (diffInHours < 1) {
-        return 'Just now';
-      } else if (diffInHours < 24) {
-        const hours = Math.floor(diffInHours);
-        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-      } else {
-        const days = Math.floor(diffInHours / 24);
-        return `${days} day${days > 1 ? 's' : ''} ago`;
-      }
-    } catch (error) {
-      return 'Recently updated';
-    }
+    // Always return simple activity messages, no timestamp parsing
+    return lastActivity || 'Recently updated';
   };
 
   // Version management helper functions
@@ -975,7 +954,7 @@ const ContentHub = () => {
             platforms: newProject.platforms,
             deliverables: newProject.deliverables,
       feedback: null,
-            last_activity: new Date().toISOString(),
+            last_activity: 'Project created',
             tags: newProject.tags
           }
         ])
