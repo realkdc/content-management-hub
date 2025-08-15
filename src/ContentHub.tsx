@@ -1000,41 +1000,41 @@ const ContentHub = () => {
 
 
   const ProjectCard: React.FC<{ project: Project }> = ({ project }) => (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
           {getTypeIcon(project.type)}
             <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
               {getTypeLabel(project.type)}
             </span>
           </div>
-          <h3 className="font-medium text-gray-900">{project.title}</h3>
+          <h3 className="font-medium text-gray-900 text-sm sm:text-base truncate">{project.title}</h3>
         </div>
-        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)} ml-2`}>
           <div className="flex items-center space-x-1">
             {getStatusIcon(project.status)}
-            <span>{getStatusDisplayName(project.status)}</span>
+            <span className="hidden sm:inline">{getStatusDisplayName(project.status)}</span>
           </div>
         </div>
       </div>
       
-      <div className="space-y-2 text-sm text-gray-600">
+      <div className="space-y-2 text-xs sm:text-sm text-gray-600">
         <div className="flex items-center space-x-2">
-          <User className="w-4 h-4" />
-          <span>{project.client}</span>
+          <User className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span className="truncate">{project.client}</span>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between text-xs">
           <span>Version {project.version}</span>
-          <span>Due: {project.dueDate}</span>
+          <span>Due: {new Date(project.dueDate).toLocaleDateString()}</span>
         </div>
         <div className="flex items-center space-x-2">
-          <Upload className="w-4 h-4" />
+          <Upload className="w-3 h-3 sm:w-4 sm:h-4" />
           <span>{project.files?.length || 0} file{(project.files?.length || 0) !== 1 ? 's' : ''}</span>
         </div>
         {project.feedback && (
           <div className="bg-gray-50 p-2 rounded text-xs">
-            <strong>Latest feedback:</strong> {project.feedback}
+            <strong>Latest feedback:</strong> <span className="truncate">{project.feedback}</span>
           </div>
         )}
         <div className="text-xs text-gray-400">
@@ -1042,27 +1042,27 @@ const ContentHub = () => {
         </div>
       </div>
       
-      <div className="mt-3 flex space-x-2">
+      <div className="mt-3 flex space-x-1 sm:space-x-2">
         <button 
           onClick={() => setSelectedProject(project)}
-          className="flex-1 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
+          className="flex-1 bg-blue-600 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
         >
           <Eye className="w-3 h-3" />
           <span>View</span>
         </button>
         <button 
           onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
-          className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
+          className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
           title="Toggle Status"
         >
-          <CheckCircle className="w-4 h-4" />
+          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
         <button 
           onClick={() => deleteProject(project.id)}
-          className="px-3 py-1 border border-red-300 rounded text-sm hover:bg-red-50 transition-colors text-red-600"
+          className="px-2 sm:px-3 py-1 border border-red-300 rounded text-sm hover:bg-red-50 transition-colors text-red-600"
           title="Delete Project"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
       </div>
     </div>
@@ -1084,10 +1084,10 @@ const ContentHub = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Content Hub</h1>
-            <div className="flex items-center space-x-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-3 sm:py-4">
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Content Hub</h1>
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button 
                 onClick={() => {
                   if (projects.length === 0) {
@@ -1113,17 +1113,19 @@ const ContentHub = () => {
                     }
                   }
                 }}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                className="bg-green-600 text-white px-2 sm:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1 sm:space-x-2"
               >
                 <Upload className="w-4 h-4" />
-                <span>Upload Files</span>
+                <span className="hidden sm:inline">Upload Files</span>
+                <span className="sm:hidden">Upload</span>
               </button>
               <button 
                 onClick={handleNewProject}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                className="bg-blue-600 text-white px-2 sm:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1 sm:space-x-2"
               >
                 <Plus className="w-4 h-4" />
-                <span>New Project</span>
+                <span className="hidden sm:inline">New Project</span>
+                <span className="sm:hidden">New</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -1146,9 +1148,9 @@ const ContentHub = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Navigation Tabs */}
-        <nav className="flex space-x-8 mb-8">
+        <nav className="flex space-x-4 sm:space-x-8 mb-6 sm:mb-8 overflow-x-auto">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { id: 'projects', label: 'All Projects', icon: FileText },
@@ -1158,14 +1160,14 @@ const ContentHub = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 pb-2 border-b-2 transition-colors ${
+              className={`flex items-center space-x-1 sm:space-x-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
+              <span className="text-sm sm:text-base">{tab.label}</span>
             </button>
           ))}
         </nav>
@@ -1176,51 +1178,51 @@ const ContentHub = () => {
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-lg border">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+              <div className="bg-white p-3 sm:p-6 rounded-lg border">
                 <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded">
-                    <FileText className="w-6 h-6 text-blue-600" />
+                  <div className="p-1 sm:p-2 bg-blue-100 rounded">
+                    <FileText className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().totalProjects}</p>
-                    <p className="text-gray-600">Total Projects</p>
+                  <div className="ml-2 sm:ml-4">
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().totalProjects}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Total Projects</p>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-3 sm:p-6 rounded-lg border">
                 <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded">
-                    <Clock className="w-6 h-6 text-yellow-600" />
+                  <div className="p-1 sm:p-2 bg-yellow-100 rounded">
+                    <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-yellow-600" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().pendingReview}</p>
-                    <p className="text-gray-600">Pending Review</p>
+                  <div className="ml-2 sm:ml-4">
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().pendingReview}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Pending Review</p>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-3 sm:p-6 rounded-lg border">
                 <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div className="p-1 sm:p-2 bg-green-100 rounded">
+                    <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().completedThisMonth}</p>
-                    <p className="text-gray-600">Completed This Month</p>
+                  <div className="ml-2 sm:ml-4">
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().completedThisMonth}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Completed This Month</p>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-lg border">
+              <div className="bg-white p-3 sm:p-6 rounded-lg border">
                 <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded">
-                    <User className="w-6 h-6 text-purple-600" />
+                  <div className="p-1 sm:p-2 bg-purple-100 rounded">
+                    <User className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
                   </div>
-                  <div className="ml-4">
-                    <p className="text-2xl font-semibold text-gray-900">{getDashboardStats().activeClients}</p>
-                    <p className="text-gray-600">Active Clients</p>
+                  <div className="ml-2 sm:ml-4">
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().activeClients}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Active Clients</p>
                   </div>
                 </div>
               </div>
@@ -1228,60 +1230,62 @@ const ContentHub = () => {
 
             {/* Recent Projects */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Projects</h2>
-                <div className="flex items-center space-x-4">
-                  {/* Content Type Filter */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Type:</label>
-                    <select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value as ContentType | 'all')}
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="all">All Types</option>
-                      <option value="video">🎥 Video Content</option>
-                      <option value="image">🖼️ Image Content</option>
-                      <option value="text">📝 Text/Captions</option>
-                    </select>
-                  </div>
+              <div className="mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3">Projects</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+                    {/* Content Type Filter */}
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 hidden sm:inline">Type:</label>
+                      <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value as ContentType | 'all')}
+                        className="w-full sm:w-auto border border-gray-300 rounded px-2 sm:px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All Types</option>
+                        <option value="video">🎥 Video</option>
+                        <option value="image">🖼️ Image</option>
+                        <option value="text">📝 Text</option>
+                      </select>
+                    </div>
 
-                  {/* Status Filter */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="draft">📝 Draft</option>
-                      <option value="editor_review">👁️ Editor Review</option>
-                      <option value="client_review">📤 Client Review</option>
-                      <option value="needs_revision">🔧 Needs Revision</option>
-                      <option value="approved">✅ Approved</option>
-                      <option value="final_delivered">🎯 Final Delivered</option>
-                    </select>
-                  </div>
+                    {/* Status Filter */}
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 hidden sm:inline">Status:</label>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
+                        className="w-full sm:w-auto border border-gray-300 rounded px-2 sm:px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="draft">📝 Draft</option>
+                        <option value="editor_review">👁️ Editor Review</option>
+                        <option value="client_review">📤 Client Review</option>
+                        <option value="needs_revision">🔧 Needs Revision</option>
+                        <option value="approved">✅ Approved</option>
+                        <option value="final_delivered">🎯 Final Delivered</option>
+                      </select>
+                    </div>
 
-                  {/* Sort By */}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Sort:</label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as 'dueDate' | 'client' | 'status' | 'type')}
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="dueDate">📅 Due Date</option>
-                      <option value="client">👤 Client</option>
-                      <option value="type">🎯 Content Type</option>
-                      <option value="status">📊 Status</option>
-                    </select>
+                    {/* Sort By */}
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 hidden sm:inline">Sort:</label>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'dueDate' | 'client' | 'status' | 'type')}
+                        className="w-full sm:w-auto border border-gray-300 rounded px-2 sm:px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="dueDate">📅 Due Date</option>
+                        <option value="client">👤 Client</option>
+                        <option value="type">🎯 Content Type</option>
+                        <option value="status">📊 Status</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {getFilteredAndSortedProjects().map((project) => (
                   <ProjectCard key={project.id} project={project} />
                 ))}
@@ -1506,11 +1510,11 @@ const ContentHub = () => {
 
       {/* Project Detail Modal */}
       {selectedProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
-          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-2 sm:p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">{selectedProject.title}</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 truncate pr-4">{selectedProject.title}</h2>
                 <button
                   onClick={() => setSelectedProject(null)}
                   className="text-gray-400 hover:text-gray-600"
