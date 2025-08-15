@@ -1252,7 +1252,7 @@ const ContentHub = () => {
       )}
 
       {currentUser && (
-        <div>
+        <>
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1959,7 +1959,7 @@ const ContentHub = () => {
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* New Project Modal - Enhanced */}
@@ -2394,7 +2394,6 @@ const ContentHub = () => {
                   >
                     Cancel
                   </button>
-                </div>
                 </div>
               </div>
             </div>
