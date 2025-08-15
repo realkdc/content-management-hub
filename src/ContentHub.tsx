@@ -792,8 +792,11 @@ const ContentHub = () => {
   };
 
   const formatLastActivity = (lastActivity: string) => {
-    // Always return simple activity messages, no timestamp parsing
-    return lastActivity || 'Recently updated';
+    // Always return clean activity messages, ignore any timestamps
+    if (!lastActivity || lastActivity.includes('T') || lastActivity.includes('Z') || lastActivity.includes('+')) {
+      return 'Recently updated';
+    }
+    return lastActivity;
   };
 
   // Version management helper functions
