@@ -643,7 +643,7 @@ const ContentHub = () => {
         const updatedExistingFiles = existingFiles.map(f => 
           f.name === file.name ? { ...f, isLatest: false } : f
         );
-
+        
         const newFile: ProjectFile = {
           id: fileId,
           name: file.name,
@@ -799,9 +799,9 @@ const ContentHub = () => {
   const deleteProject = async (projectId: number) => {
     try {
       await deleteProjectFromSupabase(projectId);
-      setProjects(prev => prev.filter(project => project.id !== projectId));
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(null);
+    setProjects(prev => prev.filter(project => project.id !== projectId));
+    if (selectedProject?.id === projectId) {
+      setSelectedProject(null);
       }
       alert('Project deleted successfully!');
     } catch (error) {
@@ -1252,8 +1252,8 @@ const ContentHub = () => {
       )}
 
       {currentUser && (
-        <>
-          {/* Header */}
+        <div>
+      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -1272,8 +1272,6 @@ const ContentHub = () => {
               >
                 Logout
               </button>
-            </div>
-            <div className="flex items-center space-x-4">
               <button 
                 onClick={() => {
                   if (projects.length === 0) {
@@ -1728,7 +1726,7 @@ const ContentHub = () => {
                 </div>
                 
                 {/* Feedback Section */}
-                <div>
+                  <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-gray-700">Latest Feedback:</span>
                     <button
@@ -1774,14 +1772,14 @@ const ContentHub = () => {
                   ) : (
                     <div>
                       {selectedProject.feedback ? (
-                        <div className="bg-gray-50 p-3 rounded-lg mt-1">
-                          {selectedProject.feedback}
-                        </div>
+                    <div className="bg-gray-50 p-3 rounded-lg mt-1">
+                      {selectedProject.feedback}
+                    </div>
                       ) : (
                         <p className="text-gray-500 text-sm mt-1">No feedback yet</p>
                       )}
-                    </div>
-                  )}
+                  </div>
+                )}
                 </div>
                 
                 {/* Files Section */}
@@ -1833,7 +1831,7 @@ const ContentHub = () => {
                              <FileText className="w-4 h-4" />}
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
-                                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
                                 <span className={`text-xs px-2 py-1 rounded-full ${file.isLatest ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                   v{file.version}
                                 </span>
@@ -1913,18 +1911,18 @@ const ContentHub = () => {
                   <h3 className="font-medium text-gray-700 mb-2">Actions</h3>
                   <div className="flex flex-wrap gap-2">
                     <div className="flex items-center space-x-2">
-                      <select 
-                        value={selectedProject.status} 
-                        onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
-                        className="border border-gray-300 px-3 py-2 rounded text-sm"
-                      >
+                    <select 
+                      value={selectedProject.status} 
+                      onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
+                      className="border border-gray-300 px-3 py-2 rounded text-sm"
+                    >
                         <option value="draft">Draft</option>
                         <option value="editor_review">Editor Review</option>
                         <option value="client_review">Client Review</option>
-                        <option value="needs_revision">Needs Revision</option>
-                        <option value="approved">Approved</option>
+                      <option value="needs_revision">Needs Revision</option>
+                      <option value="approved">Approved</option>
                         <option value="final_delivered">Final Delivered</option>
-                      </select>
+                    </select>
                       
                       {/* Quick workflow action buttons */}
                       {selectedProject.status !== 'final_delivered' && (
@@ -2397,11 +2395,11 @@ const ContentHub = () => {
                     Cancel
                   </button>
                 </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        </>
       )}
     </div>
   );
