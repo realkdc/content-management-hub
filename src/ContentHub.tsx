@@ -748,12 +748,33 @@ const ContentHub = () => {
     alert('Feedback saved successfully!');
   };
 
-  const deleteProject = (projectId: number) => {
+  const deleteProjectFromSupabase = async (projectId: number): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
+  }
+};
+
+const deleteProject = async (projectId: number) => {
+  try {
+    await deleteProjectFromSupabase(projectId);
     setProjects(prev => prev.filter(project => project.id !== projectId));
     if (selectedProject?.id === projectId) {
       setSelectedProject(null);
     }
-  };
+    alert('Project deleted successfully!');
+  } catch (error) {
+    console.error('Failed to delete project:', error);
+    alert('Failed to delete project. Please try again.');
+  }
+};
 
   const saveNewClient = async () => {
     if (!newClient.name || !newClient.email || !newClient.company) return;
