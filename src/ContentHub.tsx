@@ -279,6 +279,22 @@ const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientsUnlocked, setClientsUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+
+  // Simple password protection for clients section
+  const CLIENT_PASSWORD = 'admin123'; // You can change this to whatever you want
+  
+  const handleClientPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === CLIENT_PASSWORD) {
+      setClientsUnlocked(true);
+      setPasswordInput('');
+    } else {
+      alert('Incorrect password');
+      setPasswordInput('');
+    }
+  };
 
   // Load data from Supabase on component mount
   useEffect(() => {
@@ -1463,74 +1479,122 @@ const ContentHub = () => {
 
         {activeTab === 'clients' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Client Management</h2>
-              <button 
-                onClick={() => setShowNewClientModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Client</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {clients.map((client) => (
-                <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <User className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-medium text-gray-900">{client.name}</h3>
-                    </div>
-                    <div className="flex space-x-1">
-                      <button 
-                        onClick={() => editClient(client)}
-                        className="p-1 text-gray-400 hover:text-blue-600"
-                        title="Edit client"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => deleteClient(client.id)}
-                        className="p-1 text-gray-400 hover:text-red-600"
-                        title="Delete client"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            {!clientsUnlocked ? (
+              // Password Protection Screen
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="bg-white rounded-lg border border-gray-200 p-8 max-w-md w-full">
+                  <div className="text-center mb-6">
+                    <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Client Management</h2>
+                    <p className="text-gray-600">This section is password protected</p>
                   </div>
                   
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">Company:</span>
-                      <span>{client.company}</span>
+                  <form onSubmit={handleClientPasswordSubmit} className="space-y-4">
+                    <div>
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                        Enter Password
+                      </label>
+                      <input
+                        type="password"
+                        id="password"
+                        value={passwordInput}
+                        onChange={(e) => setPasswordInput(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Password"
+                        required
+                      />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">Email:</span>
-                      <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">
-                        {client.email}
-                      </a>
-                    </div>
-                    {client.phone && (
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">Phone:</span>
-                        <a href={`tel:${client.phone}`} className="text-blue-600 hover:underline">
-                          {client.phone}
-                        </a>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-xs text-gray-400">
-                        {client.projects.length} project{client.projects.length !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        Since {new Date(client.createdDate).toLocaleDateString()}
-                      </span>
-                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Access Clients
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              // Original Client Management Content
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900">Client Management</h2>
+                  <div className="flex items-center space-x-3">
+                    <button 
+                      onClick={() => setClientsUnlocked(false)}
+                      className="text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
+                      title="Lock clients section"
+                    >
+                      🔒 Lock
+                    </button>
+                    <button 
+                      onClick={() => setShowNewClientModal(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>New Client</span>
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {clients.map((client) => (
+                    <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-5 h-5 text-blue-600" />
+                          <h3 className="font-medium text-gray-900">{client.name}</h3>
+                        </div>
+                        <div className="flex space-x-1">
+                          <button 
+                            onClick={() => editClient(client)}
+                            className="p-1 text-gray-400 hover:text-blue-600"
+                            title="Edit client"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteClient(client.id)}
+                            className="p-1 text-gray-400 hover:text-red-600"
+                            title="Delete client"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">Company:</span>
+                          <span>{client.company}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">Email:</span>
+                          <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">
+                            {client.email}
+                          </a>
+                        </div>
+                        {client.phone && (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">Phone:</span>
+                            <a href={`tel:${client.phone}`} className="text-blue-600 hover:underline">
+                              {client.phone}
+                            </a>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between pt-2">
+                          <span className="text-xs text-gray-400">
+                            {client.projects.length} project{client.projects.length !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            Since {new Date(client.createdDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
