@@ -83,14 +83,14 @@ const mapOldStatusToNew = (oldStatus: any): ProjectStatus => {
   return statusMap[oldStatus] || 'draft';
 };
 
-// Local Storage helpers
-const saveToLocalStorage = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.error('Error saving to localStorage:', error);
-  }
-};
+// Local Storage helpers - REMOVED as requested
+// const saveToLocalStorage = (key: string, data: any) => {
+//   try {
+//     localStorage.setItem(key, JSON.stringify(data));
+//   } catch (error) {
+//     console.error('Error saving to localStorage:', error);
+//   }
+// };
 
 // Supabase data functions
 const loadProjectsFromSupabase = async (): Promise<Project[]> => {
@@ -371,14 +371,14 @@ const ContentHub = () => {
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    saveToLocalStorage('projects', projects);
-  }, [projects]);
+  // Save to localStorage whenever data changes - REMOVED as requested
+  // useEffect(() => {
+  //   saveToLocalStorage('projects', projects);
+  // }, [projects]);
 
-  useEffect(() => {
-    saveToLocalStorage('clients', clients);
-  }, [clients]);
+  // useEffect(() => {
+  //   saveToLocalStorage('clients', clients);
+  // }, [clients]);
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
@@ -955,9 +955,20 @@ const ContentHub = () => {
   };
 
   const saveNewProject = async () => {
-    if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) return;
+    if (!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) {
+      console.log('Validation failed:', { 
+        client: newProject.client, 
+        title: newProject.title, 
+        dueDate: newProject.dueDate, 
+        description: newProject.description 
+      });
+      alert('Please fill in all required fields: Client, Title, Due Date, and Description');
+      return;
+    }
     
     try {
+      console.log('Attempting to save project:', newProject);
+      
       // Insert project into Supabase
       const { data, error } = await supabase
         .from('projects')
@@ -986,7 +997,10 @@ const ContentHub = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       // Convert database format to app format
       const newProjectData: Project = {
@@ -1012,6 +1026,8 @@ const ContentHub = () => {
         files: []
       };
 
+      console.log('Project saved successfully:', newProjectData);
+      
       // Add to local state
       setProjects(prev => [...prev, newProjectData]);
     } catch (error) {
