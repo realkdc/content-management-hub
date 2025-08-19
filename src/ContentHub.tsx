@@ -7,6 +7,33 @@ import { supabase, DatabaseProject, DatabaseClient } from './supabaseClient';
 
 type ProjectStatus = 'draft' | 'editor_review' | 'client_review' | 'needs_revision' | 'approved' | 'final_delivered';
 type ContentType = 'video' | 'image' | 'text';
+type PostStatus = 'scheduled' | 'posted' | 'draft';
+
+interface PostedContent {
+  id: number;
+  projectId: number;
+  projectTitle: string;
+  client: string;
+  contentForm: string;
+  contentBucket: string;
+  numberOfContent: number;
+  link: string;
+  caption: string;
+  feedback: string;
+  comments: string;
+  numberOfLikes: number;
+  liveLink: string;
+  platform: string;
+  scheduledDate: string;
+  postedDate: string;
+  status: PostStatus;
+  analytics: {
+    views?: number;
+    shares?: number;
+    saves?: number;
+    reach?: number;
+  };
+}
 
 
 interface Project {
@@ -303,6 +330,126 @@ const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> =>
   }
 };
 
+const loadPostedContentFromSupabase = async (): Promise<PostedContent[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('posted_content')
+      .select('*')
+      .order('scheduled_date', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []).map((post: any) => ({
+      id: post.id,
+      projectId: post.project_id,
+      projectTitle: post.project_title,
+      client: post.client,
+      contentForm: post.content_form,
+      contentBucket: post.content_bucket,
+      numberOfContent: post.number_of_content,
+      link: post.link,
+      caption: post.caption,
+      feedback: post.feedback,
+      comments: post.comments,
+      numberOfLikes: post.number_of_likes,
+      liveLink: post.live_link,
+      platform: post.platform,
+      scheduledDate: post.scheduled_date,
+      postedDate: post.posted_date,
+      status: post.status,
+      analytics: post.analytics || {}
+    }));
+  } catch (error) {
+    console.error('Error loading posted content:', error);
+    return [];
+  }
+};
+
+const savePostedContentToSupabase = async (post: Omit<PostedContent, 'id'>): Promise<PostedContent> => {
+  try {
+    const { data, error } = await supabase
+      .from('posted_content')
+      .insert([{
+        project_id: post.projectId,
+        project_title: post.projectTitle,
+        client: post.client,
+        content_form: post.contentForm,
+        content_bucket: post.contentBucket,
+        number_of_content: post.numberOfContent,
+        link: post.link,
+        caption: post.caption,
+        feedback: post.feedback,
+        comments: post.comments,
+        number_of_likes: post.numberOfLikes,
+        live_link: post.liveLink,
+        platform: post.platform,
+        scheduled_date: post.scheduledDate,
+        posted_date: post.postedDate,
+        status: post.status,
+        analytics: post.analytics
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      projectId: data.project_id,
+      projectTitle: data.project_title,
+      client: data.client,
+      contentForm: data.content_form,
+      contentBucket: data.content_bucket,
+      numberOfContent: data.number_of_content,
+      link: data.link,
+      caption: data.caption,
+      feedback: data.feedback,
+      comments: data.comments,
+      numberOfLikes: data.number_of_likes,
+      liveLink: data.live_link,
+      platform: data.platform,
+      scheduledDate: data.scheduled_date,
+      postedDate: data.posted_date,
+      status: data.status,
+      analytics: data.analytics || {}
+    };
+  } catch (error) {
+    console.error('Error saving posted content:', error);
+    throw error;
+  }
+};
+
+const updatePostedContentInSupabase = async (postId: number, updates: Partial<PostedContent>): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('posted_content')
+      .update({
+        project_title: updates.projectTitle,
+        client: updates.client,
+        content_form: updates.contentForm,
+        content_bucket: updates.contentBucket,
+        number_of_content: updates.numberOfContent,
+        link: updates.link,
+        caption: updates.caption,
+        feedback: updates.feedback,
+        comments: updates.comments,
+        number_of_likes: updates.numberOfLikes,
+        live_link: updates.liveLink,
+        platform: updates.platform,
+        scheduled_date: updates.scheduledDate,
+        posted_date: updates.postedDate,
+        status: updates.status,
+        analytics: updates.analytics
+      })
+      .eq('id', postId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating posted content:', error);
+    throw error;
+  }
+};
+
 
 
 const ContentHub = () => {
@@ -330,12 +477,14 @@ const ContentHub = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const [projectsData, clientsData] = await Promise.all([
+      const [projectsData, clientsData, postedContentData] = await Promise.all([
         loadProjectsFromSupabase(),
-        loadClientsFromSupabase()
+        loadClientsFromSupabase(),
+        loadPostedContentFromSupabase()
       ]);
       setProjects(projectsData);
       setClients(clientsData);
+      setPostedContent(postedContentData);
       setLoading(false);
     };
     loadData();
@@ -359,6 +508,10 @@ const ContentHub = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
+  const [postedContent, setPostedContent] = useState<PostedContent[]>([]);
+  const [showNewPostModal, setShowNewPostModal] = useState(false);
+  const [showEditPostModal, setShowEditPostModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<PostedContent | null>(null);
   const currentUser = {
     name: 'Admin User', // In real app, this would come from authentication
     email: 'admin@example.com'
@@ -401,6 +554,41 @@ const ContentHub = () => {
     phone: ''
   });
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [newPost, setNewPost] = useState<{
+    projectId: number;
+    projectTitle: string;
+    client: string;
+    contentForm: string;
+    contentBucket: string;
+    numberOfContent: number;
+    link: string;
+    caption: string;
+    feedback: string;
+    comments: string;
+    numberOfLikes: number;
+    liveLink: string;
+    platform: string;
+    scheduledDate: string;
+    postedDate: string;
+    status: PostStatus;
+  }>({
+    projectId: 0,
+    projectTitle: '',
+    client: '',
+    contentForm: '',
+    contentBucket: '',
+    numberOfContent: 1,
+    link: '',
+    caption: '',
+    feedback: '',
+    comments: '',
+    numberOfLikes: 0,
+    liveLink: '',
+    platform: '',
+    scheduledDate: '',
+    postedDate: '',
+    status: 'draft'
+  });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Save to localStorage whenever data changes - REMOVED as requested
@@ -1029,6 +1217,132 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
+  const createNewPost = (project: Project) => {
+    setNewPost({
+      projectId: project.id,
+      projectTitle: project.title,
+      client: project.client,
+      contentForm: project.type,
+      contentBucket: '',
+      numberOfContent: 1,
+      link: '',
+      caption: '',
+      feedback: '',
+      comments: '',
+      numberOfLikes: 0,
+      liveLink: '',
+      platform: project.platforms?.[0] || '',
+      scheduledDate: '',
+      postedDate: '',
+      status: 'draft'
+    });
+    setShowNewPostModal(true);
+  };
+
+  const saveNewPost = async () => {
+    if (!newPost.projectTitle || !newPost.client) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    try {
+      const savedPost = await savePostedContentToSupabase(newPost);
+      setPostedContent(prev => [savedPost, ...prev]);
+      
+      // Reset form and close modal
+      setNewPost({
+        projectId: 0,
+        projectTitle: '',
+        client: '',
+        contentForm: '',
+        contentBucket: '',
+        numberOfContent: 1,
+        link: '',
+        caption: '',
+        feedback: '',
+        comments: '',
+        numberOfLikes: 0,
+        liveLink: '',
+        platform: '',
+        scheduledDate: '',
+        postedDate: '',
+        status: 'draft'
+      });
+      setShowNewPostModal(false);
+      alert('Post created successfully!');
+    } catch (error) {
+      console.error('Failed to save post:', error);
+      alert('Failed to save post. Please try again.');
+    }
+  };
+
+  const editPost = (post: PostedContent) => {
+    setSelectedPost(post);
+    setNewPost({
+      projectId: post.projectId,
+      projectTitle: post.projectTitle,
+      client: post.client,
+      contentForm: post.contentForm,
+      contentBucket: post.contentBucket,
+      numberOfContent: post.numberOfContent,
+      link: post.link,
+      caption: post.caption,
+      feedback: post.feedback,
+      comments: post.comments,
+      numberOfLikes: post.numberOfLikes,
+      liveLink: post.liveLink,
+      platform: post.platform,
+      scheduledDate: post.scheduledDate,
+      postedDate: post.postedDate,
+      status: post.status
+    });
+    setShowEditPostModal(true);
+  };
+
+  const updatePost = async () => {
+    if (!selectedPost || !newPost.projectTitle || !newPost.client) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    try {
+      await updatePostedContentInSupabase(selectedPost.id, newPost);
+      
+      // Update local state
+      setPostedContent(prev => prev.map(post => 
+        post.id === selectedPost.id 
+          ? { ...post, ...newPost }
+          : post
+      ));
+      
+      // Reset form and close modal
+      setNewPost({
+        projectId: 0,
+        projectTitle: '',
+        client: '',
+        contentForm: '',
+        contentBucket: '',
+        numberOfContent: 1,
+        link: '',
+        caption: '',
+        feedback: '',
+        comments: '',
+        numberOfLikes: 0,
+        liveLink: '',
+        platform: '',
+        scheduledDate: '',
+        postedDate: '',
+        status: 'draft'
+      });
+      setSelectedPost(null);
+      setShowEditPostModal(false);
+      alert('Post updated successfully!');
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      alert('Failed to update post. Please try again.');
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -1424,6 +1738,7 @@ const deleteProject = async (projectId: number) => {
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { id: 'projects', label: 'All Projects', icon: FileText },
             { id: 'calendar', label: 'Calendar', icon: Calendar },
+            { id: 'content-calendar', label: 'Content Calendar', icon: Calendar },
             { id: 'clients', label: 'Clients', icon: User }
           ].map((tab) => (
             <button
@@ -1699,6 +2014,86 @@ const deleteProject = async (projectId: number) => {
                   <p className="text-center text-gray-500 py-8">No upcoming deadlines</p>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'content-calendar' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Content Calendar</h2>
+              <button 
+                onClick={() => setShowNewPostModal(true)}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Post</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {postedContent.map((post) => (
+                <div key={post.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 text-sm truncate">{post.projectTitle}</h3>
+                      <p className="text-xs text-gray-600">{post.client}</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      <button 
+                        onClick={() => editPost(post)}
+                        className="p-1 text-gray-400 hover:text-blue-600"
+                        title="Edit post"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-xs text-gray-600">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Platform:</span>
+                      <span>{post.platform || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Status:</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        post.status === 'posted' ? 'bg-green-100 text-green-800' :
+                        post.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {post.status}
+                      </span>
+                    </div>
+                    {post.scheduledDate && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Scheduled:</span>
+                        <span>{new Date(post.scheduledDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {post.postedDate && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Posted:</span>
+                        <span>{new Date(post.postedDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {post.numberOfLikes > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Likes:</span>
+                        <span>{post.numberOfLikes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {postedContent.length === 0 && (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p>No posts scheduled yet</p>
+                  <p className="text-sm">Create your first post to get started</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2054,6 +2449,15 @@ const deleteProject = async (projectId: number) => {
                       <Edit className="w-3 h-3" />
                       <span>Edit Project</span>
                     </button>
+                    {selectedProject.status === 'final_delivered' && (
+                      <button 
+                        onClick={() => createNewPost(selectedProject)}
+                        className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 flex items-center space-x-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Create Post</span>
+                      </button>
+                    )}
                     <div className="flex items-center space-x-2">
                       <select 
                         value={selectedProject.status} 
@@ -2832,6 +3236,545 @@ const deleteProject = async (projectId: number) => {
                     Cancel
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Post Modal */}
+      {showNewPostModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Create New Post</h2>
+                <button
+                  onClick={() => setShowNewPostModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Post Information</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newPost.projectTitle}
+                      onChange={(e) => setNewPost({...newPost, projectTitle: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Strain of the Week: Super Lemon Haze"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client *
+                    </label>
+                    <input
+                      type="text"
+                      value={newPost.client}
+                      onChange={(e) => setNewPost({...newPost, client: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., GreenHaus Cannabis Co."
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Form
+                      </label>
+                      <input
+                        type="text"
+                        value={newPost.contentForm}
+                        onChange={(e) => setNewPost({...newPost, contentForm: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="e.g., Video, Image, Text"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Bucket
+                      </label>
+                      <input
+                        type="text"
+                        value={newPost.contentBucket}
+                        onChange={(e) => setNewPost({...newPost, contentBucket: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="e.g., Interactive, Educational"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        # of Content
+                      </label>
+                      <input
+                        type="number"
+                        value={newPost.numberOfContent}
+                        onChange={(e) => setNewPost({...newPost, numberOfContent: parseInt(e.target.value) || 1})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Platform
+                      </label>
+                      <select
+                        value={newPost.platform}
+                        onChange={(e) => setNewPost({...newPost, platform: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Platform</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="TikTok">TikTok</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="Twitter">Twitter</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Scheduled Date
+                      </label>
+                      <input
+                        type="date"
+                        value={newPost.scheduledDate}
+                        onChange={(e) => setNewPost({...newPost, scheduledDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Posted Date
+                      </label>
+                      <input
+                        type="date"
+                        value={newPost.postedDate}
+                        onChange={(e) => setNewPost({...newPost, postedDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={newPost.status}
+                      onChange={(e) => setNewPost({...newPost, status: e.target.value as PostStatus})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="posted">Posted</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Content Details</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Link
+                    </label>
+                    <input
+                      type="url"
+                      value={newPost.link}
+                      onChange={(e) => setNewPost({...newPost, link: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Caption
+                    </label>
+                    <textarea
+                      value={newPost.caption}
+                      onChange={(e) => setNewPost({...newPost, caption: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                      placeholder="Post caption..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Feedback
+                    </label>
+                    <textarea
+                      value={newPost.feedback}
+                      onChange={(e) => setNewPost({...newPost, feedback: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="e.g., Have staff shoot"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Comments
+                    </label>
+                    <textarea
+                      value={newPost.comments}
+                      onChange={(e) => setNewPost({...newPost, comments: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="Additional comments..."
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        # of Likes
+                      </label>
+                      <input
+                        type="number"
+                        value={newPost.numberOfLikes}
+                        onChange={(e) => setNewPost({...newPost, numberOfLikes: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Live Link
+                      </label>
+                      <input
+                        type="url"
+                        value={newPost.liveLink}
+                        onChange={(e) => setNewPost({...newPost, liveLink: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+                <button
+                  onClick={() => setShowNewPostModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewPost}
+                  disabled={!newPost.projectTitle || !newPost.client}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Create Post
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Post Modal */}
+      {showEditPostModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Edit Post</h2>
+                <button
+                  onClick={() => {
+                    setShowEditPostModal(false);
+                    setSelectedPost(null);
+                    setNewPost({
+                      projectId: 0,
+                      projectTitle: '',
+                      client: '',
+                      contentForm: '',
+                      contentBucket: '',
+                      numberOfContent: 1,
+                      link: '',
+                      caption: '',
+                      feedback: '',
+                      comments: '',
+                      numberOfLikes: 0,
+                      liveLink: '',
+                      platform: '',
+                      scheduledDate: '',
+                      postedDate: '',
+                      status: 'draft'
+                    });
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Post Information</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newPost.projectTitle}
+                      onChange={(e) => setNewPost({...newPost, projectTitle: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client *
+                    </label>
+                    <input
+                      type="text"
+                      value={newPost.client}
+                      onChange={(e) => setNewPost({...newPost, client: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Form
+                      </label>
+                      <input
+                        type="text"
+                        value={newPost.contentForm}
+                        onChange={(e) => setNewPost({...newPost, contentForm: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Bucket
+                      </label>
+                      <input
+                        type="text"
+                        value={newPost.contentBucket}
+                        onChange={(e) => setNewPost({...newPost, contentBucket: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        # of Content
+                      </label>
+                      <input
+                        type="number"
+                        value={newPost.numberOfContent}
+                        onChange={(e) => setNewPost({...newPost, numberOfContent: parseInt(e.target.value) || 1})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Platform
+                      </label>
+                      <select
+                        value={newPost.platform}
+                        onChange={(e) => setNewPost({...newPost, platform: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Platform</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="TikTok">TikTok</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="Twitter">Twitter</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Scheduled Date
+                      </label>
+                      <input
+                        type="date"
+                        value={newPost.scheduledDate}
+                        onChange={(e) => setNewPost({...newPost, scheduledDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Posted Date
+                      </label>
+                      <input
+                        type="date"
+                        value={newPost.postedDate}
+                        onChange={(e) => setNewPost({...newPost, postedDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={newPost.status}
+                      onChange={(e) => setNewPost({...newPost, status: e.target.value as PostStatus})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="posted">Posted</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Content Details</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Link
+                    </label>
+                    <input
+                      type="url"
+                      value={newPost.link}
+                      onChange={(e) => setNewPost({...newPost, link: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Caption
+                    </label>
+                    <textarea
+                      value={newPost.caption}
+                      onChange={(e) => setNewPost({...newPost, caption: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Feedback
+                    </label>
+                    <textarea
+                      value={newPost.feedback}
+                      onChange={(e) => setNewPost({...newPost, feedback: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Comments
+                    </label>
+                    <textarea
+                      value={newPost.comments}
+                      onChange={(e) => setNewPost({...newPost, comments: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        # of Likes
+                      </label>
+                      <input
+                        type="number"
+                        value={newPost.numberOfLikes}
+                        onChange={(e) => setNewPost({...newPost, numberOfLikes: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Live Link
+                      </label>
+                      <input
+                        type="url"
+                        value={newPost.liveLink}
+                        onChange={(e) => setNewPost({...newPost, liveLink: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditPostModal(false);
+                    setSelectedPost(null);
+                    setNewPost({
+                      projectId: 0,
+                      projectTitle: '',
+                      client: '',
+                      contentForm: '',
+                      contentBucket: '',
+                      numberOfContent: 1,
+                      link: '',
+                      caption: '',
+                      feedback: '',
+                      comments: '',
+                      numberOfLikes: 0,
+                      liveLink: '',
+                      platform: '',
+                      scheduledDate: '',
+                      postedDate: '',
+                      status: 'draft'
+                    });
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={updatePost}
+                  disabled={!newPost.projectTitle || !newPost.client}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Update Post
+                </button>
               </div>
             </div>
           </div>
