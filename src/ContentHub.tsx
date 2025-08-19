@@ -571,6 +571,12 @@ const ContentHub = () => {
     scheduledDate: string;
     postedDate: string;
     status: PostStatus;
+    analytics: {
+      views?: number;
+      shares?: number;
+      saves?: number;
+      reach?: number;
+    };
   }>({
     projectId: 0,
     projectTitle: '',
@@ -587,7 +593,8 @@ const ContentHub = () => {
     platform: '',
     scheduledDate: '',
     postedDate: '',
-    status: 'draft'
+    status: 'draft',
+    analytics: {}
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1234,7 +1241,8 @@ const deleteProject = async (projectId: number) => {
       platform: project.platforms?.[0] || '',
       scheduledDate: '',
       postedDate: '',
-      status: 'draft'
+      status: 'draft',
+      analytics: {}
     });
     setShowNewPostModal(true);
   };
@@ -1266,7 +1274,8 @@ const deleteProject = async (projectId: number) => {
         platform: '',
         scheduledDate: '',
         postedDate: '',
-        status: 'draft'
+        status: 'draft',
+        analytics: {}
       });
       setShowNewPostModal(false);
       alert('Post created successfully!');
@@ -1294,7 +1303,8 @@ const deleteProject = async (projectId: number) => {
       platform: post.platform,
       scheduledDate: post.scheduledDate,
       postedDate: post.postedDate,
-      status: post.status
+      status: post.status,
+      analytics: post.analytics
     });
     setShowEditPostModal(true);
   };
@@ -1332,7 +1342,8 @@ const deleteProject = async (projectId: number) => {
         platform: '',
         scheduledDate: '',
         postedDate: '',
-        status: 'draft'
+        status: 'draft',
+        analytics: {}
       });
       setSelectedPost(null);
       setShowEditPostModal(false);
@@ -1585,7 +1596,7 @@ const deleteProject = async (projectId: number) => {
               {getTypeLabel(project.type)}
             </span>
           </div>
-          <h3 className="font-medium text-gray-900 text-sm sm:text-base truncate">{project.title}</h3>
+          <h3 className="font-medium text-gray-900 text-sm sm:text-base break-words leading-tight">{project.title}</h3>
         </div>
         <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)} ml-2`}>
           <div className="flex items-center space-x-1">
@@ -1598,7 +1609,7 @@ const deleteProject = async (projectId: number) => {
       <div className="space-y-2 text-xs sm:text-sm text-gray-600">
         <div className="flex items-center space-x-2">
           <User className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span className="truncate">{project.client}</span>
+          <span className="break-words">{project.client}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span>Version {project.version}</span>
@@ -3522,7 +3533,8 @@ const deleteProject = async (projectId: number) => {
                       platform: '',
                       scheduledDate: '',
                       postedDate: '',
-                      status: 'draft'
+                      status: 'draft',
+                      analytics: {}
                     });
                   }}
                   className="text-gray-400 hover:text-gray-600"
@@ -3761,7 +3773,8 @@ const deleteProject = async (projectId: number) => {
                       platform: '',
                       scheduledDate: '',
                       postedDate: '',
-                      status: 'draft'
+                      status: 'draft',
+                      analytics: {}
                     });
                   }}
                   className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
