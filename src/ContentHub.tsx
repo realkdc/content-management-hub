@@ -1607,9 +1607,9 @@ const deleteProject = async (projectId: number) => {
       </div>
       
       <div className="space-y-2 text-xs sm:text-sm text-gray-600">
-        <div className="flex items-center space-x-2">
-          <User className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span className="break-words">{project.client}</span>
+        <div className="flex items-start space-x-2">
+          <User className="w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0" />
+          <span className="break-words leading-tight">{project.client}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span>Version {project.version}</span>
@@ -1621,7 +1621,7 @@ const deleteProject = async (projectId: number) => {
         </div>
         {project.feedback && (
           <div className="bg-gray-50 p-2 rounded text-xs">
-            <strong>Latest feedback:</strong> <span className="truncate">{project.feedback}</span>
+            <strong>Latest feedback:</strong> <span className="break-words leading-tight">{project.feedback}</span>
           </div>
         )}
         <div className="text-xs text-gray-400">
@@ -1987,11 +1987,11 @@ const deleteProject = async (projectId: number) => {
                         isUrgent ? 'bg-yellow-50 border-yellow-200' : 
                         'bg-gray-50 border-gray-200'
                       }`}>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-start space-x-3">
                           {getTypeIcon(project.type)}
-                          <div>
-                            <p className="font-medium text-gray-900">{project.title}</p>
-                            <p className="text-sm text-gray-600">{project.client}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 break-words leading-tight">{project.title}</p>
+                            <p className="text-sm text-gray-600 break-words leading-tight">{project.client}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
@@ -2047,8 +2047,8 @@ const deleteProject = async (projectId: number) => {
                 <div key={post.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 text-sm truncate">{post.projectTitle}</h3>
-                      <p className="text-xs text-gray-600">{post.client}</p>
+                      <h3 className="font-medium text-gray-900 text-sm break-words leading-tight">{post.projectTitle}</h3>
+                      <p className="text-xs text-gray-600 break-words leading-tight">{post.client}</p>
                     </div>
                     <div className="flex space-x-1">
                       <button 
