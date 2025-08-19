@@ -477,14 +477,22 @@ const ContentHub = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const [projectsData, clientsData, postedContentData] = await Promise.all([
-        loadProjectsFromSupabase(),
-        loadClientsFromSupabase(),
-        loadPostedContentFromSupabase()
-      ]);
-      setProjects(projectsData);
-      setClients(clientsData);
-      setPostedContent(postedContentData);
+      try {
+        const [projectsData, clientsData, postedContentData] = await Promise.all([
+          loadProjectsFromSupabase(),
+          loadClientsFromSupabase(),
+          loadPostedContentFromSupabase()
+        ]);
+        setProjects(projectsData);
+        setClients(clientsData);
+        setPostedContent(postedContentData);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // If there's an error (like missing table), start with empty data
+        setProjects([]);
+        setClients([]);
+        setPostedContent([]);
+      }
       setLoading(false);
     };
     loadData();
@@ -1288,6 +1296,18 @@ const deleteProject = async (projectId: number) => {
 
   const editPost = (post: PostedContent) => {
     setSelectedPost(post);
+    
+    // Format dates properly for the form inputs
+    const formatDateForInput = (dateString: string) => {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      } catch {
+        return '';
+      }
+    };
+    
     setNewPost({
       projectId: post.projectId,
       projectTitle: post.projectTitle,
@@ -1302,8 +1322,8 @@ const deleteProject = async (projectId: number) => {
       numberOfLikes: post.numberOfLikes,
       liveLink: post.liveLink,
       platform: post.platform,
-      scheduledDate: post.scheduledDate,
-      postedDate: post.postedDate,
+      scheduledDate: formatDateForInput(post.scheduledDate),
+      postedDate: formatDateForInput(post.postedDate),
       status: post.status,
       analytics: post.analytics
     });
