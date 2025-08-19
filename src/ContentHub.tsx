@@ -205,6 +205,36 @@ const updateClientInSupabase = async (clientId: number, updates: Partial<Client>
   }
 };
 
+const updateProjectInSupabase = async (projectId: number, updates: Partial<Project>): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        client: updates.client,
+        title: updates.title,
+        type: updates.type,
+        subtype: updates.subtype,
+        priority: updates.priority,
+        due_date: updates.dueDate,
+        estimated_hours: updates.estimatedHours,
+        budget: updates.budget,
+        description: updates.description,
+        objectives: updates.objectives,
+        target_audience: updates.targetAudience,
+        platforms: updates.platforms,
+        deliverables: updates.deliverables,
+        tags: updates.tags,
+        last_activity: 'Project updated'
+      })
+      .eq('id', projectId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    throw error;
+  }
+};
+
 const deleteClientFromSupabase = async (clientId: number): Promise<void> => {
   try {
     const { error } = await supabase
@@ -325,6 +355,7 @@ const ContentHub = () => {
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showEditClientModal, setShowEditClientModal] = useState(false);
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackInput, setFeedbackInput] = useState('');
@@ -369,6 +400,7 @@ const ContentHub = () => {
     company: '',
     phone: ''
   });
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Save to localStorage whenever data changes - REMOVED as requested
@@ -847,6 +879,123 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
+  const editProject = (project: Project) => {
+    setEditingProject(project);
+    setNewProject({
+      client: project.client,
+      title: project.title,
+      type: project.type,
+      subtype: project.subtype || '',
+      priority: project.priority,
+      dueDate: project.dueDate,
+      estimatedHours: project.estimatedHours || 0,
+      budget: project.budget || 0,
+      description: project.description,
+      objectives: project.objectives || '',
+      targetAudience: project.targetAudience || '',
+      platforms: project.platforms || [],
+      deliverables: project.deliverables || '',
+      tags: project.tags || []
+    });
+    setShowEditProjectModal(true);
+  };
+
+  const updateProject = async () => {
+    if (!editingProject || !newProject.client || !newProject.title || !newProject.dueDate || !newProject.description) {
+      alert('Please fill in all required fields: Client, Title, Due Date, and Description');
+      return;
+    }
+    
+    try {
+      await updateProjectInSupabase(editingProject.id, {
+        client: newProject.client,
+        title: newProject.title,
+        type: newProject.type,
+        subtype: newProject.subtype,
+        priority: newProject.priority,
+        dueDate: newProject.dueDate,
+        estimatedHours: newProject.estimatedHours,
+        budget: newProject.budget,
+        description: newProject.description,
+        objectives: newProject.objectives,
+        targetAudience: newProject.targetAudience,
+        platforms: newProject.platforms,
+        deliverables: newProject.deliverables,
+        tags: newProject.tags
+      });
+    
+      // Update local state
+      setProjects(prev => prev.map(project => 
+        project.id === editingProject.id 
+          ? { 
+              ...project, 
+              client: newProject.client,
+              title: newProject.title,
+              type: newProject.type,
+              subtype: newProject.subtype,
+              priority: newProject.priority,
+              dueDate: newProject.dueDate,
+              estimatedHours: newProject.estimatedHours,
+              budget: newProject.budget,
+              description: newProject.description,
+              objectives: newProject.objectives,
+              targetAudience: newProject.targetAudience,
+              platforms: newProject.platforms,
+              deliverables: newProject.deliverables,
+              tags: newProject.tags,
+              lastActivity: 'Project updated'
+            }
+          : project
+      ));
+
+      // Update selected project if it's the one being edited
+      if (selectedProject && selectedProject.id === editingProject.id) {
+        setSelectedProject(prev => prev ? {
+          ...prev,
+          client: newProject.client,
+          title: newProject.title,
+          type: newProject.type,
+          subtype: newProject.subtype,
+          priority: newProject.priority,
+          dueDate: newProject.dueDate,
+          estimatedHours: newProject.estimatedHours,
+          budget: newProject.budget,
+          description: newProject.description,
+          objectives: newProject.objectives,
+          targetAudience: newProject.targetAudience,
+          platforms: newProject.platforms,
+          deliverables: newProject.deliverables,
+          tags: newProject.tags,
+          lastActivity: 'Project updated'
+        } : null);
+      }
+    
+      // Reset form and close modal
+      setNewProject({
+        client: '',
+        title: '',
+        type: 'video',
+        subtype: '',
+        priority: 'medium',
+        dueDate: '',
+        estimatedHours: 0,
+        budget: 0,
+        description: '',
+        objectives: '',
+        targetAudience: '',
+        platforms: [],
+        deliverables: '',
+        tags: []
+      });
+      setEditingProject(null);
+      setShowEditProjectModal(false);
+      alert('Project updated successfully!');
+    } catch (error) {
+      console.error('Failed to update project:', error);
+      alert('Failed to update project. Please try again.');
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -1129,6 +1278,13 @@ const deleteProject = async (projectId: number) => {
         >
           <Eye className="w-3 h-3" />
           <span>View</span>
+        </button>
+        <button 
+          onClick={() => editProject(project)}
+          className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
+          title="Edit Project"
+        >
+          <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
         <button 
           onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
@@ -1858,6 +2014,13 @@ const deleteProject = async (projectId: number) => {
                 <div className="border-t pt-4">
                   <h3 className="font-medium text-gray-700 mb-2">Actions</h3>
                   <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => editProject(selectedProject)}
+                      className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 flex items-center space-x-1"
+                    >
+                      <Edit className="w-3 h-3" />
+                      <span>Edit Project</span>
+                    </button>
                     <div className="flex items-center space-x-2">
                       <select 
                         value={selectedProject.status} 
@@ -2169,6 +2332,299 @@ const deleteProject = async (projectId: number) => {
                   >
                   Create Project
                   </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditProjectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Edit Project</h2>
+                <button
+                  onClick={() => {
+                    setShowEditProjectModal(false);
+                    setEditingProject(null);
+                    setNewProject({
+                      client: '',
+                      title: '',
+                      type: 'video',
+                      subtype: '',
+                      priority: 'medium',
+                      dueDate: '',
+                      estimatedHours: 0,
+                      budget: 0,
+                      description: '',
+                      objectives: '',
+                      targetAudience: '',
+                      platforms: [],
+                      deliverables: '',
+                      tags: []
+                    });
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column - Basic Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Basic Information</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client *
+                    </label>
+                    <select
+                      value={newProject.client}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select a client...</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.company}>
+                          {client.company} ({client.name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.title}
+                      onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Instagram Reel - Product Launch"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content Type *
+                      </label>
+                      <select
+                        value={newProject.type}
+                        onChange={(e) => setNewProject({...newProject, type: e.target.value as ContentType})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="video">🎥 Video</option>
+                        <option value="image">🖼️ Image</option>
+                        <option value="text">📝 Text/Copy</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subtype
+                      </label>
+                      <input
+                        type="text"
+                        value={newProject.subtype}
+                        onChange={(e) => setNewProject({...newProject, subtype: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Instagram Reel, Blog Post, etc."
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority
+                      </label>
+                      <select
+                        value={newProject.priority}
+                        onChange={(e) => setNewProject({...newProject, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent'})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="low">🟢 Low</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="high">🟠 High</option>
+                        <option value="urgent">🔴 Urgent</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={newProject.dueDate}
+                        onChange={(e) => setNewProject({...newProject, dueDate: e.target.value})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Estimated Hours
+                      </label>
+                      <input
+                        type="number"
+                        value={newProject.estimatedHours}
+                        onChange={(e) => setNewProject({...newProject, estimatedHours: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Budget ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={newProject.budget}
+                        onChange={(e) => setNewProject({...newProject, budget: parseInt(e.target.value) || 0})}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Detailed Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Project Details</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description *
+                    </label>
+                    <textarea
+                      value={newProject.description}
+                      onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-none"
+                      placeholder="Brief description of the project..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Objectives/Goals
+                    </label>
+                    <textarea
+                      value={newProject.objectives}
+                      onChange={(e) => setNewProject({...newProject, objectives: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="What's the goal? Drive sales, increase awareness, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Target Audience
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.targetAudience}
+                      onChange={(e) => setNewProject({...newProject, targetAudience: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., Cannabis enthusiasts, 25-45 years old"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Platforms
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'LinkedIn'].map((platform) => (
+                        <label key={platform} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={newProject.platforms.includes(platform)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewProject({...newProject, platforms: [...newProject.platforms, platform]});
+                              } else {
+                                setNewProject({...newProject, platforms: newProject.platforms.filter(p => p !== platform)});
+                              }
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{platform}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Deliverables
+                    </label>
+                    <textarea
+                      value={newProject.deliverables}
+                      onChange={(e) => setNewProject({...newProject, deliverables: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                      placeholder="What exactly will be delivered? e.g., 3 video versions, captions, thumbnails"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      value={newProject.tags.join(', ')}
+                      onChange={(e) => setNewProject({...newProject, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., product-launch, thca, social-media (comma separated)"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+                <button
+                  onClick={() => {
+                    setShowEditProjectModal(false);
+                    setEditingProject(null);
+                    setNewProject({
+                      client: '',
+                      title: '',
+                      type: 'video',
+                      subtype: '',
+                      priority: 'medium',
+                      dueDate: '',
+                      estimatedHours: 0,
+                      budget: 0,
+                      description: '',
+                      objectives: '',
+                      targetAudience: '',
+                      platforms: [],
+                      deliverables: '',
+                      tags: []
+                    });
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={updateProject}
+                  disabled={!newProject.client || !newProject.title || !newProject.dueDate || !newProject.description}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Update Project
+                </button>
               </div>
             </div>
           </div>
