@@ -741,43 +741,76 @@ const ContentHub = () => {
     }
   };
 
-  const updateProjectStatus = (projectId: number, status: ProjectStatus) => {
-    setProjects(prev => prev.map(project => 
-      project.id === projectId 
-        ? { ...project, status, lastActivity: 'Just now' }
-        : project
-    ));
-    
-    // Also update selectedProject if it's the one being updated
-    if (selectedProject && selectedProject.id === projectId) {
-      setSelectedProject(prev => prev ? { ...prev, status, lastActivity: 'Just now' } : null);
+  const updateProjectStatus = async (projectId: number, status: ProjectStatus) => {
+    try {
+      // Update in Supabase database
+      const { error } = await supabase
+        .from('projects')
+        .update({ 
+          status: status,
+          last_activity: 'Status updated'
+        })
+        .eq('id', projectId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setProjects(prev => prev.map(project => 
+        project.id === projectId 
+          ? { ...project, status, lastActivity: 'Status updated' }
+          : project
+      ));
+      
+      // Also update selectedProject if it's the one being updated
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject(prev => prev ? { ...prev, status, lastActivity: 'Status updated' } : null);
+      }
+    } catch (error) {
+      console.error('Error updating project status:', error);
+      alert('Failed to update project status. Please try again.');
     }
   };
 
-  const saveFeedback = (projectId: number) => {
+  const saveFeedback = async (projectId: number) => {
     if (!feedbackInput.trim()) return;
     
-    // Update projects array
-    setProjects(prev => prev.map(project => 
-      project.id === projectId 
-        ? { ...project, feedback: feedbackInput.trim(), lastActivity: 'Feedback added' }
-        : project
-    ));
-    
-    // Update selectedProject if it's the one being updated
-    if (selectedProject && selectedProject.id === projectId) {
-      setSelectedProject(prev => prev ? { 
-        ...prev, 
-        feedback: feedbackInput.trim(), 
-        lastActivity: 'Feedback added' 
-      } : null);
+    try {
+      // Update in Supabase database
+      const { error } = await supabase
+        .from('projects')
+        .update({ 
+          feedback: feedbackInput.trim(),
+          last_activity: 'Feedback added'
+        })
+        .eq('id', projectId);
+      
+      if (error) throw error;
+      
+      // Update projects array
+      setProjects(prev => prev.map(project => 
+        project.id === projectId 
+          ? { ...project, feedback: feedbackInput.trim(), lastActivity: 'Feedback added' }
+          : project
+      ));
+      
+      // Update selectedProject if it's the one being updated
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject(prev => prev ? { 
+          ...prev, 
+          feedback: feedbackInput.trim(), 
+          lastActivity: 'Feedback added' 
+        } : null);
+      }
+      
+      // Reset feedback input state
+      setShowFeedbackInput(false);
+      setFeedbackInput('');
+      
+      alert('Feedback saved successfully!');
+    } catch (error) {
+      console.error('Error saving feedback:', error);
+      alert('Failed to save feedback. Please try again.');
     }
-    
-    // Reset feedback input state
-    setShowFeedbackInput(false);
-    setFeedbackInput('');
-    
-    alert('Feedback saved successfully!');
   };
 
   const deleteProjectFromSupabase = async (projectId: number): Promise<void> => {
@@ -1287,7 +1320,7 @@ const deleteProject = async (projectId: number) => {
           <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
         <button 
-          onClick={() => updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
+          onClick={async () => await updateProjectStatus(project.id, project.status === 'approved' ? 'client_review' : 'approved')}
           className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
           title="Toggle Status"
         >
@@ -1857,7 +1890,7 @@ const deleteProject = async (projectId: number) => {
                       />
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => saveFeedback(selectedProject.id)}
+                          onClick={async () => await saveFeedback(selectedProject.id)}
                           className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
                         >
                           Save Feedback
@@ -2024,7 +2057,7 @@ const deleteProject = async (projectId: number) => {
                     <div className="flex items-center space-x-2">
                       <select 
                         value={selectedProject.status} 
-                        onChange={(e) => updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
+                        onChange={async (e) => await updateProjectStatus(selectedProject.id, e.target.value as ProjectStatus)}
                         className="border border-gray-300 px-3 py-2 rounded text-sm"
                       >
                         <option value="draft">Draft</option>
@@ -2038,7 +2071,7 @@ const deleteProject = async (projectId: number) => {
                       {/* Quick workflow action buttons */}
                       {selectedProject.status !== 'final_delivered' && (
                         <button
-                          onClick={() => updateProjectStatus(selectedProject.id, getNextWorkflowStatus(selectedProject.status))}
+                          onClick={async () => await updateProjectStatus(selectedProject.id, getNextWorkflowStatus(selectedProject.status))}
                           className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
                         >
                           {selectedProject.status === 'draft' ? 'Send to Review' :
@@ -2051,7 +2084,7 @@ const deleteProject = async (projectId: number) => {
                       
                       {(selectedProject.status === 'editor_review' || selectedProject.status === 'client_review') && (
                         <button
-                          onClick={() => updateProjectStatus(selectedProject.id, 'needs_revision')}
+                          onClick={async () => await updateProjectStatus(selectedProject.id, 'needs_revision')}
                           className="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700"
                         >
                           Request Changes
