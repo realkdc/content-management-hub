@@ -1225,6 +1225,7 @@ const deleteProject = async (projectId: number) => {
   };
 
   const createNewPost = (project: Project) => {
+    const today = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
     setNewPost({
       projectId: project.id,
       projectTitle: project.title,
@@ -1239,8 +1240,8 @@ const deleteProject = async (projectId: number) => {
       numberOfLikes: 0,
       liveLink: '',
       platform: project.platforms?.[0] || '',
-      scheduledDate: '',
-      postedDate: '',
+      scheduledDate: today,
+      postedDate: today,
       status: 'draft',
       analytics: {}
     });
@@ -2034,7 +2035,29 @@ const deleteProject = async (projectId: number) => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Content Calendar</h2>
               <button 
-                onClick={() => setShowNewPostModal(true)}
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setNewPost({
+                    projectId: 0,
+                    projectTitle: '',
+                    client: '',
+                    contentForm: '',
+                    contentBucket: '',
+                    numberOfContent: 1,
+                    link: '',
+                    caption: '',
+                    feedback: '',
+                    comments: '',
+                    numberOfLikes: 0,
+                    liveLink: '',
+                    platform: '',
+                    scheduledDate: today,
+                    postedDate: today,
+                    status: 'draft',
+                    analytics: {}
+                  });
+                  setShowNewPostModal(true);
+                }}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
