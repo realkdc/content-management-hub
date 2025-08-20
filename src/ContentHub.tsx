@@ -1342,16 +1342,20 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
-  // Helper function to format dates for display (MM/DD/YYYY)
+  // Helper function to format dates for display (MM/DD/YYYY) without timezone shifts
   const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
     try {
+      // If value is YYYY-MM-DD, parse as local date to avoid UTC shifting
+      const yyyyMmDd = /^\d{4}-\d{2}-\d{2}$/;
+      if (yyyyMmDd.test(dateString)) {
+        const [y, m, d] = dateString.split('-').map(Number);
+        const date = new Date(y, (m as number) - 1, d as number);
+        return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+      }
+      // Fallback for other formats
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric'
-      });
+      return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     } catch {
       return dateString;
     }
