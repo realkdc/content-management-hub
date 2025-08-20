@@ -2207,8 +2207,11 @@ const deleteProject = async (projectId: number) => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => deletePost(post.id)}
-                        className="p-1 text-gray-400 hover:text-red-600"
+                        onClick={() => {
+                          console.log('Delete button clicked for post ID:', post.id);
+                          deletePost(post.id);
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded"
                         title="Delete post"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -2249,6 +2252,17 @@ const deleteProject = async (projectId: number) => {
                         <span>{post.numberOfLikes}</span>
                       </div>
                     )}
+                    <div className="flex justify-end pt-2">
+                      <button 
+                        onClick={() => {
+                          console.log('Delete button clicked for post ID:', post.id);
+                          deletePost(post.id);
+                        }}
+                        className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 transition-colors"
+                      >
+                        Delete Post
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
