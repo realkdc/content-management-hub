@@ -1379,7 +1379,7 @@ const deleteProject = async (projectId: number) => {
   };
 
   const deletePost = async (postId: number) => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
     
     try {
       console.log('Attempting to delete post with ID:', postId);
@@ -3924,7 +3924,7 @@ const deleteProject = async (projectId: number) => {
               <div className="flex justify-between pt-6 border-t mt-6">
                 <button
                   onClick={() => {
-                    if (selectedPost && confirm('Are you sure you want to delete this post?')) {
+                    if (selectedPost && window.confirm('Are you sure you want to delete this post?')) {
                       deletePost(selectedPost.id);
                     }
                   }}
