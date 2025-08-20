@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock, CheckCircle, AlertCircle, X, Edit, Trash2, Eye, Download } from 'lucide-react';
+import { Plus, Upload, Calendar, BarChart3, User, Video, Image, FileText, Clock, CheckCircle, AlertCircle, X, Edit, Trash2, Eye, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -567,6 +567,10 @@ const ContentHub = () => {
   const [postedContent, setPostedContent] = useState<PostedContent[]>([]);
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [showEditPostModal, setShowEditPostModal] = useState(false);
+  // Content Calendar UI state
+  const [contentCalendarViewMode, setContentCalendarViewMode] = useState<'cards' | 'calendar'>('cards');
+  const [contentCalendarClientFilter, setContentCalendarClientFilter] = useState<string>('all');
+  const [contentCalendarMonth, setContentCalendarMonth] = useState<Date>(new Date());
   const [selectedPost, setSelectedPost] = useState<PostedContent | null>(null);
   const currentUser = {
     name: 'Admin User', // In real app, this would come from authentication
@@ -2089,6 +2093,70 @@ const deleteProject = async (projectId: number) => {
               </div>
             </div>
 
+            {contentCalendarViewMode === 'calendar' ? (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}><ChevronLeft className="w-4 h-4" /></button>
+                    <div className="text-sm font-medium">{contentCalendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
+                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}><ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                  <button className="text-sm underline" onClick={() => setContentCalendarMonth(new Date())}>Today</button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-2 text-xs">
+                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                    <div key={d} className="text-gray-500 font-medium text-center py-1">{d}</div>
+                  ))}
+                  {(() => {
+                    const firstDay = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth(), 1);
+                    const startOffset = firstDay.getDay();
+                    const daysInMonth = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth() + 1, 0).getDate();
+                    const cells: JSX.Element[] = [];
+                    const filtered = postedContent.filter(p => {
+                      if (contentCalendarClientFilter !== 'all' && p.client !== contentCalendarClientFilter) return false;
+                      const dateStr = p.scheduledDate || p.postedDate;
+                      if (!dateStr) return false;
+                      const [y, m] = dateStr.split('-');
+                      return Number(y) === contentCalendarMonth.getFullYear() && Number(m) === (contentCalendarMonth.getMonth() + 1);
+                    });
+                    const dateToPosts: Record<string, PostedContent[]> = {};
+                    filtered.forEach(p => {
+                      const dateStr = p.scheduledDate || p.postedDate;
+                      if (!dateStr) return;
+                      dateToPosts[dateStr] = dateToPosts[dateStr] || [];
+                      dateToPosts[dateStr].push(p);
+                    });
+                    for (let i = 0; i < startOffset; i++) {
+                      cells.push(<div key={`empty-${i}`} className="p-2 border rounded bg-gray-50" />);
+                    }
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const yyyy = contentCalendarMonth.getFullYear();
+                      const mm = String(contentCalendarMonth.getMonth() + 1).padStart(2,'0');
+                      const dd = String(day).padStart(2,'0');
+                      const key = `${yyyy}-${mm}-${dd}`;
+                      const posts = dateToPosts[key] || [];
+                      cells.push(
+                        <div key={key} className="p-2 border rounded align-top min-h-[90px]">
+                          <div className="text-[11px] text-gray-500 mb-1">{day}</div>
+                          <div className="space-y-1">
+                            {posts.slice(0,3).map(p => (
+                              <button key={p.id} onClick={() => editPost(p)} className="block w-full text-left truncate text-[11px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200">
+                                {p.platform ? `${p.platform}: ` : ''}{p.projectTitle}
+                              </button>
+                            ))}
+                            {posts.length > 3 && (
+                              <div className="text-[10px] text-gray-500">+{posts.length - 3} more</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return cells;
+                  })()}
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {getFilteredAndSortedProjects().map((project) => (
                 <ProjectCard key={project.id} project={project} />
@@ -2173,39 +2241,71 @@ const deleteProject = async (projectId: number) => {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Content Calendar</h2>
-              <button 
-                onClick={() => {
-                  const today = getTodayLocal();
-                  setNewPost({
-                    projectId: 0,
-                    projectTitle: '',
-                    client: '',
-                    contentForm: '',
-                    contentBucket: '',
-                    numberOfContent: 1,
-                    link: '',
-                    caption: '',
-                    feedback: '',
-                    comments: '',
-                    numberOfLikes: 0,
-                    liveLink: '',
-                    platform: '',
-                    scheduledDate: today,
-                    postedDate: today,
-                    status: 'draft',
-                    analytics: {}
-                  });
-                  setShowNewPostModal(true);
-                }}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Post</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <select
+                  value={contentCalendarClientFilter}
+                  onChange={(e) => setContentCalendarClientFilter(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="all">All Clients</option>
+                  {Array.from(new Set(postedContent.map(p => p.client))).map((client) => (
+                    <option key={client} value={client}>{client}</option>
+                  ))}
+                </select>
+
+                <div className="inline-flex rounded-md shadow-sm" role="group">
+                  <button
+                    type="button"
+                    className={`px-3 py-2 text-sm border border-gray-300 rounded-l-lg ${contentCalendarViewMode === 'cards' ? 'bg-gray-100' : 'bg-white'}`}
+                    onClick={() => setContentCalendarViewMode('cards')}
+                  >
+                    Cards
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-2 text-sm border border-gray-300 rounded-r-lg ${contentCalendarViewMode === 'calendar' ? 'bg-gray-100' : 'bg-white'}`}
+                    onClick={() => setContentCalendarViewMode('calendar')}
+                  >
+                    Calendar
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    const today = getTodayLocal();
+                    setNewPost({
+                      projectId: 0,
+                      projectTitle: '',
+                      client: '',
+                      contentForm: '',
+                      contentBucket: '',
+                      numberOfContent: 1,
+                      link: '',
+                      caption: '',
+                      feedback: '',
+                      comments: '',
+                      numberOfLikes: 0,
+                      liveLink: '',
+                      platform: '',
+                      scheduledDate: today,
+                      postedDate: today,
+                      status: 'draft',
+                      analytics: {}
+                    });
+                    setShowNewPostModal(true);
+                  }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>New Post</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {postedContent.map((post) => (
+              {postedContent
+                .filter(post => contentCalendarClientFilter === 'all' || post.client === contentCalendarClientFilter)
+                .map((post) => (
                 <div key={post.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
