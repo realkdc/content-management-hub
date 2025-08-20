@@ -2093,70 +2093,6 @@ const deleteProject = async (projectId: number) => {
               </div>
             </div>
 
-            {contentCalendarViewMode === 'calendar' ? (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}><ChevronLeft className="w-4 h-4" /></button>
-                    <div className="text-sm font-medium">{contentCalendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
-                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}><ChevronRight className="w-4 h-4" /></button>
-                  </div>
-                  <button className="text-sm underline" onClick={() => setContentCalendarMonth(new Date())}>Today</button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 text-xs">
-                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                    <div key={d} className="text-gray-500 font-medium text-center py-1">{d}</div>
-                  ))}
-                  {(() => {
-                    const firstDay = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth(), 1);
-                    const startOffset = firstDay.getDay();
-                    const daysInMonth = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth() + 1, 0).getDate();
-                    const cells: JSX.Element[] = [];
-                    const filtered = postedContent.filter(p => {
-                      if (contentCalendarClientFilter !== 'all' && p.client !== contentCalendarClientFilter) return false;
-                      const dateStr = p.scheduledDate || p.postedDate;
-                      if (!dateStr) return false;
-                      const [y, m] = dateStr.split('-');
-                      return Number(y) === contentCalendarMonth.getFullYear() && Number(m) === (contentCalendarMonth.getMonth() + 1);
-                    });
-                    const dateToPosts: Record<string, PostedContent[]> = {};
-                    filtered.forEach(p => {
-                      const dateStr = p.scheduledDate || p.postedDate;
-                      if (!dateStr) return;
-                      dateToPosts[dateStr] = dateToPosts[dateStr] || [];
-                      dateToPosts[dateStr].push(p);
-                    });
-                    for (let i = 0; i < startOffset; i++) {
-                      cells.push(<div key={`empty-${i}`} className="p-2 border rounded bg-gray-50" />);
-                    }
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const yyyy = contentCalendarMonth.getFullYear();
-                      const mm = String(contentCalendarMonth.getMonth() + 1).padStart(2,'0');
-                      const dd = String(day).padStart(2,'0');
-                      const key = `${yyyy}-${mm}-${dd}`;
-                      const posts = dateToPosts[key] || [];
-                      cells.push(
-                        <div key={key} className="p-2 border rounded align-top min-h-[90px]">
-                          <div className="text-[11px] text-gray-500 mb-1">{day}</div>
-                          <div className="space-y-1">
-                            {posts.slice(0,3).map(p => (
-                              <button key={p.id} onClick={() => editPost(p)} className="block w-full text-left truncate text-[11px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200">
-                                {p.platform ? `${p.platform}: ` : ''}{p.projectTitle}
-                              </button>
-                            ))}
-                            {posts.length > 3 && (
-                              <div className="text-[10px] text-gray-500">+{posts.length - 3} more</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return cells;
-                  })()}
-                </div>
-              </div>
-            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {getFilteredAndSortedProjects().map((project) => (
                 <ProjectCard key={project.id} project={project} />
@@ -2302,6 +2238,70 @@ const deleteProject = async (projectId: number) => {
               </div>
             </div>
 
+            {contentCalendarViewMode === 'calendar' ? (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}><ChevronLeft className="w-4 h-4" /></button>
+                    <div className="text-sm font-medium">{contentCalendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
+                    <button className="p-2 border rounded" onClick={() => setContentCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}><ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                  <button className="text-sm underline" onClick={() => setContentCalendarMonth(new Date())}>Today</button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-2 text-xs">
+                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                    <div key={d} className="text-gray-500 font-medium text-center py-1">{d}</div>
+                  ))}
+                  {(() => {
+                    const firstDay = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth(), 1);
+                    const startOffset = firstDay.getDay();
+                    const daysInMonth = new Date(contentCalendarMonth.getFullYear(), contentCalendarMonth.getMonth() + 1, 0).getDate();
+                    const cells: JSX.Element[] = [];
+                    const filtered = postedContent.filter(p => {
+                      if (contentCalendarClientFilter !== 'all' && p.client !== contentCalendarClientFilter) return false;
+                      const dateStr = p.scheduledDate || p.postedDate;
+                      if (!dateStr) return false;
+                      const [y, m] = dateStr.split('-');
+                      return Number(y) === contentCalendarMonth.getFullYear() && Number(m) === (contentCalendarMonth.getMonth() + 1);
+                    });
+                    const dateToPosts: Record<string, PostedContent[]> = {};
+                    filtered.forEach(p => {
+                      const dateStr = p.scheduledDate || p.postedDate;
+                      if (!dateStr) return;
+                      dateToPosts[dateStr] = dateToPosts[dateStr] || [];
+                      dateToPosts[dateStr].push(p);
+                    });
+                    for (let i = 0; i < startOffset; i++) {
+                      cells.push(<div key={`empty-${i}`} className="p-2 border rounded bg-gray-50" />);
+                    }
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const yyyy = contentCalendarMonth.getFullYear();
+                      const mm = String(contentCalendarMonth.getMonth() + 1).padStart(2,'0');
+                      const dd = String(day).padStart(2,'0');
+                      const key = `${yyyy}-${mm}-${dd}`;
+                      const posts = dateToPosts[key] || [];
+                      cells.push(
+                        <div key={key} className="p-2 border rounded align-top min-h-[90px]">
+                          <div className="text-[11px] text-gray-500 mb-1">{day}</div>
+                          <div className="space-y-1">
+                            {posts.slice(0,3).map(p => (
+                              <button key={p.id} onClick={() => editPost(p)} className="block w-full text-left truncate text-[11px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200">
+                                {p.platform ? `${p.platform}: ` : ''}{p.projectTitle}
+                              </button>
+                            ))}
+                            {posts.length > 3 && (
+                              <div className="text-[10px] text-gray-500">+{posts.length - 3} more</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return cells;
+                  })()}
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {postedContent
                 .filter(post => contentCalendarClientFilter === 'all' || post.client === contentCalendarClientFilter)
@@ -2378,6 +2378,7 @@ const deleteProject = async (projectId: number) => {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 
