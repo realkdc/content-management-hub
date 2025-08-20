@@ -1342,15 +1342,39 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
+  // Helper function to format dates for display (MM/DD/YYYY)
+  const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
   const editPost = (post: PostedContent) => {
     setSelectedPost(post);
     
-    // Format dates properly for the form inputs
+    // Format dates properly for the form inputs - handle timezone correctly
     const formatDateForInput = (dateString: string) => {
       if (!dateString) return '';
       try {
+        // If it's already in YYYY-MM-DD format, return as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+          return dateString;
+        }
+        
+        // For other formats, parse and format in local timezone
         const date = new Date(dateString);
-        return date.toISOString().split('T')[0];
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
       } catch {
         return '';
       }
@@ -2215,13 +2239,13 @@ const deleteProject = async (projectId: number) => {
                     {post.scheduledDate && (
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Scheduled:</span>
-                        <span>{new Date(post.scheduledDate).toLocaleDateString()}</span>
+                        <span>{formatDateForDisplay(post.scheduledDate)}</span>
                       </div>
                     )}
                     {post.postedDate && (
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Posted:</span>
-                        <span>{new Date(post.postedDate).toLocaleDateString()}</span>
+                        <span>{formatDateForDisplay(post.postedDate)}</span>
                       </div>
                     )}
                     {post.numberOfLikes > 0 && (
