@@ -2137,57 +2137,35 @@ const deleteProject = async (projectId: number) => {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Content Calendar</h2>
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => {
-                    // Clear any existing data and reload from database
-                    setPostedContent([]);
-                    window.location.reload();
-                  }}
-                  className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                >
-                  Refresh Data
-                </button>
-                <button 
-                  onClick={() => {
-                    // Force clear all posts from local state
-                    setPostedContent([]);
-                    alert('All posts cleared from local state. You can now create new posts.');
-                  }}
-                  className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
-                >
-                  Clear All Posts
-                </button>
-                <button 
-                  onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
-                    setNewPost({
-                      projectId: 0,
-                      projectTitle: '',
-                      client: '',
-                      contentForm: '',
-                      contentBucket: '',
-                      numberOfContent: 1,
-                      link: '',
-                      caption: '',
-                      feedback: '',
-                      comments: '',
-                      numberOfLikes: 0,
-                      liveLink: '',
-                      platform: '',
-                      scheduledDate: today,
-                      postedDate: today,
-                      status: 'draft',
-                      analytics: {}
-                    });
-                    setShowNewPostModal(true);
-                  }}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>New Post</span>
-                </button>
-              </div>
+              <button 
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setNewPost({
+                    projectId: 0,
+                    projectTitle: '',
+                    client: '',
+                    contentForm: '',
+                    contentBucket: '',
+                    numberOfContent: 1,
+                    link: '',
+                    caption: '',
+                    feedback: '',
+                    comments: '',
+                    numberOfLikes: 0,
+                    liveLink: '',
+                    platform: '',
+                    scheduledDate: today,
+                    postedDate: today,
+                    status: 'draft',
+                    analytics: {}
+                  });
+                  setShowNewPostModal(true);
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Post</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2252,17 +2230,6 @@ const deleteProject = async (projectId: number) => {
                         <span>{post.numberOfLikes}</span>
                       </div>
                     )}
-                    <div className="flex justify-end pt-2">
-                      <button 
-                        onClick={() => {
-                          console.log('Delete button clicked for post ID:', post.id);
-                          deletePost(post.id);
-                        }}
-                        className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 transition-colors"
-                      >
-                        Delete Post
-                      </button>
-                    </div>
                   </div>
                 </div>
               ))}
