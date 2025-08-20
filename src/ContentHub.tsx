@@ -1281,7 +1281,7 @@ const deleteProject = async (projectId: number) => {
   };
 
   const createNewPost = (project: Project) => {
-    const today = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+    const today = getTodayLocal(); // Get current date in YYYY-MM-DD format
     setNewPost({
       projectId: project.id,
       projectTitle: project.title,
@@ -1342,18 +1342,26 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
+  // Helper to get today's date as YYYY-MM-DD in local time (no timezone conversions)
+  const getTodayLocal = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Helper function to format dates for display (MM/DD/YYYY) without timezone shifts
   const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
+    // Prefer pure string conversion when value is YYYY-MM-DD
+    const yyyyMmDd = /^\d{4}-\d{2}-\d{2}$/;
+    if (yyyyMmDd.test(dateString)) {
+      const [y, m, d] = dateString.split('-');
+      return `${m}/${d}/${y}`;
+    }
+    // Fallback for other formats
     try {
-      // If value is YYYY-MM-DD, parse as local date to avoid UTC shifting
-      const yyyyMmDd = /^\d{4}-\d{2}-\d{2}$/;
-      if (yyyyMmDd.test(dateString)) {
-        const [y, m, d] = dateString.split('-').map(Number);
-        const date = new Date(y, (m as number) - 1, d as number);
-        return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-      }
-      // Fallback for other formats
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     } catch {
@@ -2167,7 +2175,7 @@ const deleteProject = async (projectId: number) => {
               <h2 className="text-xl font-semibold text-gray-900">Content Calendar</h2>
               <button 
                 onClick={() => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = getTodayLocal();
                   setNewPost({
                     projectId: 0,
                     projectTitle: '',
