@@ -67,6 +67,19 @@ content-management-hub/
 - File storage and version control
 - Advanced project filtering
 
+## Future Enhancements
+
+### Multi-User Access System (Planned)
+- **URL-Based Access Control**: Implement role-based views using URL parameters
+  - `?view=client&client=GreenHaus` → Client-specific view
+  - `?view=editor&editor=John` → Editor-specific view
+  - No URL params → Full admin view
+- **Data Filtering**: Filter projects, content calendar, and dashboard based on user role
+- **Supabase Integration**: Leverage existing database structure with client/editor fields
+- **No Database Changes**: All filtering happens in React frontend, database remains unchanged
+- **Easy Implementation**: Simple URL parameter reading and content filtering
+- **Secure Sharing**: Share specific URLs with clients/editors for their content only
+
 ## Tech Stack
 
 - **Frontend:** React 18 with TypeScript

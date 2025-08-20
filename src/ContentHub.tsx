@@ -748,7 +748,7 @@ const ContentHub = () => {
     const completedThisMonth = projects.filter(p => {
       const projectDate = new Date(p.dueDate);
       const currentDate = new Date();
-      return p.status === 'approved' && 
+      return (p.status === 'approved' || p.status === 'final_delivered') && 
              projectDate.getMonth() === currentDate.getMonth() && 
              projectDate.getFullYear() === currentDate.getFullYear();
     }).length;
