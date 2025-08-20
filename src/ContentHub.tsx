@@ -419,31 +419,62 @@ const savePostedContentToSupabase = async (post: Omit<PostedContent, 'id'>): Pro
   }
 };
 
-const updatePostedContentInSupabase = async (postId: number, updates: Partial<PostedContent>): Promise<void> => {
+const deletePostedContentFromSupabase = async (postId: number): Promise<void> => {
   try {
     const { error } = await supabase
       .from('posted_content')
-      .update({
-        project_title: updates.projectTitle,
-        client: updates.client,
-        content_form: updates.contentForm,
-        content_bucket: updates.contentBucket,
-        number_of_content: updates.numberOfContent,
-        link: updates.link,
-        caption: updates.caption,
-        feedback: updates.feedback,
-        comments: updates.comments,
-        number_of_likes: updates.numberOfLikes,
-        live_link: updates.liveLink,
-        platform: updates.platform,
-        scheduled_date: updates.scheduledDate,
-        posted_date: updates.postedDate,
-        status: updates.status,
-        analytics: updates.analytics
-      })
+      .delete()
       .eq('id', postId);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error deleting posted content:', error);
+    throw error;
+  }
+};
+
+const updatePostedContentInSupabase = async (postId: number, updates: Partial<PostedContent>): Promise<void> => {
+  try {
+    // Clean and validate the data before sending to database
+    const cleanUpdates: any = {};
+    
+    if (updates.projectTitle) cleanUpdates.project_title = updates.projectTitle;
+    if (updates.client) cleanUpdates.client = updates.client;
+    if (updates.contentForm) cleanUpdates.content_form = updates.contentForm;
+    if (updates.contentBucket) cleanUpdates.content_bucket = updates.contentBucket;
+    if (updates.numberOfContent !== undefined) cleanUpdates.number_of_content = updates.numberOfContent;
+    if (updates.link) cleanUpdates.link = updates.link;
+    if (updates.caption) cleanUpdates.caption = updates.caption;
+    if (updates.feedback) cleanUpdates.feedback = updates.feedback;
+    if (updates.comments) cleanUpdates.comments = updates.comments;
+    if (updates.numberOfLikes !== undefined) cleanUpdates.number_of_likes = updates.numberOfLikes;
+    if (updates.liveLink) cleanUpdates.live_link = updates.liveLink;
+    if (updates.platform) cleanUpdates.platform = updates.platform;
+    if (updates.status) cleanUpdates.status = updates.status;
+    if (updates.analytics) cleanUpdates.analytics = updates.analytics;
+    
+    // Handle dates properly - only include if they're valid
+    if (updates.scheduledDate && updates.scheduledDate !== 'mm/dd/yyyy') {
+      cleanUpdates.scheduled_date = updates.scheduledDate;
+    }
+    if (updates.postedDate && updates.postedDate !== 'mm/dd/yyyy') {
+      cleanUpdates.posted_date = updates.postedDate;
+    }
+    
+    console.log('Updating post with data:', cleanUpdates);
+    
+    const { error } = await supabase
+      .from('posted_content')
+      .update(cleanUpdates)
+      .eq('id', postId);
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error updating posted content:', error);
     throw error;
@@ -1330,6 +1361,28 @@ const deleteProject = async (projectId: number) => {
     setShowEditPostModal(true);
   };
 
+  const deletePost = async (postId: number) => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    
+    try {
+      await deletePostedContentFromSupabase(postId);
+      
+      // Remove from local state
+      setPostedContent(prev => prev.filter(post => post.id !== postId));
+      
+      // Close modal if it's open
+      if (selectedPost && selectedPost.id === postId) {
+        setShowEditPostModal(false);
+        setSelectedPost(null);
+      }
+      
+      alert('Post deleted successfully!');
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      alert('Failed to delete post. Please try again.');
+    }
+  };
+
   const updatePost = async () => {
     if (!selectedPost || !newPost.projectTitle || !newPost.client) {
       alert('Please fill in all required fields');
@@ -2112,6 +2165,13 @@ const deleteProject = async (projectId: number) => {
                         title="Edit post"
                       >
                         <Edit className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => deletePost(post.id)}
+                        className="p-1 text-gray-400 hover:text-red-600"
+                        title="Delete post"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
