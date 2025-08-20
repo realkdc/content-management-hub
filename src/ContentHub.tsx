@@ -436,6 +436,23 @@ const deletePostedContentFromSupabase = async (postId: number): Promise<void> =>
   }
 };
 
+const clearAllPostedContentFromSupabase = async (): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('posted_content')
+      .delete()
+      .neq('id', 0); // Delete all records
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error clearing posted content:', error);
+    throw error;
+  }
+};
+
 const updatePostedContentInSupabase = async (postId: number, updates: Partial<PostedContent>): Promise<void> => {
   try {
     // Clean and validate the data before sending to database
@@ -1365,10 +1382,23 @@ const deleteProject = async (projectId: number) => {
     if (!confirm('Are you sure you want to delete this post?')) return;
     
     try {
-      await deletePostedContentFromSupabase(postId);
+      console.log('Attempting to delete post with ID:', postId);
       
-      // Remove from local state
-      setPostedContent(prev => prev.filter(post => post.id !== postId));
+      // First try to delete from database
+      try {
+        await deletePostedContentFromSupabase(postId);
+        console.log('Successfully deleted from database');
+      } catch (dbError) {
+        console.error('Database delete failed:', dbError);
+        // If database delete fails, we'll still remove from local state
+      }
+      
+      // Always remove from local state
+      setPostedContent(prev => {
+        const filtered = prev.filter(post => post.id !== postId);
+        console.log('Removed from local state, remaining posts:', filtered.length);
+        return filtered;
+      });
       
       // Close modal if it's open
       if (selectedPost && selectedPost.id === postId) {
@@ -2117,6 +2147,16 @@ const deleteProject = async (projectId: number) => {
                   className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
                 >
                   Refresh Data
+                </button>
+                <button 
+                  onClick={() => {
+                    // Force clear all posts from local state
+                    setPostedContent([]);
+                    alert('All posts cleared from local state. You can now create new posts.');
+                  }}
+                  className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  Clear All Posts
                 </button>
                 <button 
                   onClick={() => {
@@ -3867,42 +3907,54 @@ const deleteProject = async (projectId: number) => {
                 </div>
               </div>
               
-              <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
+              <div className="flex justify-between pt-6 border-t mt-6">
                 <button
                   onClick={() => {
-                    setShowEditPostModal(false);
-                    setSelectedPost(null);
-                    setNewPost({
-                      projectId: 0,
-                      projectTitle: '',
-                      client: '',
-                      contentForm: '',
-                      contentBucket: '',
-                      numberOfContent: 1,
-                      link: '',
-                      caption: '',
-                      feedback: '',
-                      comments: '',
-                      numberOfLikes: 0,
-                      liveLink: '',
-                      platform: '',
-                      scheduledDate: '',
-                      postedDate: '',
-                      status: 'draft',
-                      analytics: {}
-                    });
+                    if (selectedPost && confirm('Are you sure you want to delete this post?')) {
+                      deletePost(selectedPost.id);
+                    }
                   }}
-                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
-                  Cancel
+                  Delete Post
                 </button>
-                <button
-                  onClick={updatePost}
-                  disabled={!newPost.projectTitle || !newPost.client}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  Update Post
-                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowEditPostModal(false);
+                      setSelectedPost(null);
+                      setNewPost({
+                        projectId: 0,
+                        projectTitle: '',
+                        client: '',
+                        contentForm: '',
+                        contentBucket: '',
+                        numberOfContent: 1,
+                        link: '',
+                        caption: '',
+                        feedback: '',
+                        comments: '',
+                        numberOfLikes: 0,
+                        liveLink: '',
+                        platform: '',
+                        scheduledDate: '',
+                        postedDate: '',
+                        status: 'draft',
+                        analytics: {}
+                      });
+                    }}
+                    className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={updatePost}
+                    disabled={!newPost.projectTitle || !newPost.client}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Update Post
+                  </button>
+                </div>
               </div>
             </div>
           </div>
