@@ -553,7 +553,7 @@ const ContentHub = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
-  const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all' | 'active'>('active');
   const [sortBy, setSortBy] = useState<'dueDate' | 'client' | 'status' | 'type'>('dueDate');
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
   const [isUploading, setIsUploading] = useState(false);
@@ -718,7 +718,10 @@ const ContentHub = () => {
     }
 
     // Filter by status
-    if (filterStatus !== 'all') {
+    if (filterStatus === 'active') {
+      // Show only active projects (not final_delivered)
+      filtered = filtered.filter(project => project.status !== 'final_delivered');
+    } else if (filterStatus !== 'all') {
       filtered = filtered.filter(project => project.status === filterStatus);
     }
 
@@ -744,6 +747,7 @@ const ContentHub = () => {
   // Calculate real dashboard statistics
   const getDashboardStats = () => {
     const totalProjects = projects.length;
+    const activeProjects = projects.filter(p => p.status !== 'final_delivered').length;
     const pendingReview = projects.filter(p => p.status === 'client_review').length;
     const completedThisMonth = projects.filter(p => {
       const projectDate = new Date(p.dueDate);
@@ -756,6 +760,7 @@ const ContentHub = () => {
 
     return {
       totalProjects,
+      activeProjects,
       pendingReview,
       completedThisMonth,
       activeClients
@@ -1924,8 +1929,8 @@ const deleteProject = async (projectId: number) => {
                     <FileText className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
                   <div className="ml-2 sm:ml-4">
-                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().totalProjects}</p>
-                    <p className="text-xs sm:text-sm text-gray-600">Total Projects</p>
+                    <p className="text-lg sm:text-2xl font-semibold text-gray-900">{getDashboardStats().activeProjects}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Active Projects</p>
                   </div>
                 </div>
               </div>
@@ -1993,9 +1998,10 @@ const deleteProject = async (projectId: number) => {
                       <label className="text-sm font-medium text-gray-700 hidden sm:inline">Status:</label>
                       <select
                         value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
+                        onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all' | 'active')}
                         className="w-full sm:w-auto border border-gray-300 rounded px-2 sm:px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
+                        <option value="active">🚀 Active (Exclude Completed)</option>
                         <option value="all">All Status</option>
                         <option value="draft">📝 Draft</option>
                         <option value="editor_review">👁️ Editor Review</option>
@@ -2030,7 +2036,14 @@ const deleteProject = async (projectId: number) => {
                 ))}
                 {getFilteredAndSortedProjects().length === 0 && (
                   <div className="col-span-full text-center py-8 text-gray-500">
-                    No projects match your current filters.
+                    {filterStatus === 'active' ? (
+                      <div>
+                        <p className="mb-2">No active projects found.</p>
+                        <p className="text-sm">All projects are completed or you can try changing the status filter.</p>
+                      </div>
+                    ) : (
+                      <p>No projects match your current filters.</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -2063,9 +2076,10 @@ const deleteProject = async (projectId: number) => {
                   <label className="text-sm font-medium text-gray-700">Status:</label>
                   <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
+                    onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all' | 'active')}
                     className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
+                    <option value="active">🚀 Active (Exclude Completed)</option>
                     <option value="all">All Status</option>
                     <option value="draft">📝 Draft</option>
                     <option value="editor_review">👁️ Editor Review</option>
@@ -2099,7 +2113,14 @@ const deleteProject = async (projectId: number) => {
               ))}
               {getFilteredAndSortedProjects().length === 0 && (
                 <div className="col-span-full text-center py-8 text-gray-500">
-                  No projects match your current filters.
+                  {filterStatus === 'active' ? (
+                    <div>
+                      <p className="mb-2">No active projects found.</p>
+                      <p className="text-sm">All projects are completed or you can try changing the status filter.</p>
+                    </div>
+                  ) : (
+                    <p>No projects match your current filters.</p>
+                  )}
                 </div>
               )}
             </div>
