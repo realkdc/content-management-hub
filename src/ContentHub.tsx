@@ -628,6 +628,22 @@ const getCurrentTimeForEditor = (timezone?: string): string => {
   }
 };
 
+// Common timezones for editor creation
+const commonTimezones = [
+  { value: 'GMT+7 (WIB)', label: 'GMT+7 (WIB) - Indonesia' },
+  { value: 'GMT+8', label: 'GMT+8 - Singapore, Malaysia' },
+  { value: 'GMT+9', label: 'GMT+9 - Japan, Korea' },
+  { value: 'GMT+0', label: 'GMT+0 - UK, Portugal' },
+  { value: 'GMT+1', label: 'GMT+1 - Germany, France' },
+  { value: 'GMT+2', label: 'GMT+2 - South Africa' },
+  { value: 'GMT+5:30', label: 'GMT+5:30 - India' },
+  { value: 'EST', label: 'EST - US East Coast' },
+  { value: 'CST', label: 'CST - US Central' },
+  { value: 'PST', label: 'PST - US West Coast' },
+  { value: 'GMT+10', label: 'GMT+10 - Australia East' },
+  { value: 'GMT-3', label: 'GMT-3 - Brazil' }
+];
+
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -682,7 +698,12 @@ const ContentHub = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [editors, setEditors] = useState<Editor[]>([]);
   const [showNewEditorInput, setShowNewEditorInput] = useState(false);
-  const [newEditorName, setNewEditorName] = useState('');
+  const [newEditorForm, setNewEditorForm] = useState({
+    name: '',
+    email: '',
+    timezone: '',
+    country: ''
+  });
   const [showNewPostEditorInput, setShowNewPostEditorInput] = useState(false);
   const [newPostEditorName, setNewPostEditorName] = useState('');
 
@@ -1435,15 +1456,15 @@ const deleteProject = async (projectId: number) => {
     }
   };
 
-  const createNewEditor = async (name: string): Promise<Editor | null> => {
-    if (!name.trim()) return null;
+  const createNewEditor = async (editorData: {name: string; email?: string; timezone?: string; country?: string}): Promise<Editor | null> => {
+    if (!editorData.name.trim()) return null;
     
     try {
       const newEditor = await saveEditorToSupabase({
-        name: name.trim(),
-        email: undefined,
-        timezone: undefined,
-        country: undefined,
+        name: editorData.name.trim(),
+        email: editorData.email?.trim() || undefined,
+        timezone: editorData.timezone?.trim() || undefined,
+        country: editorData.country?.trim() || undefined,
         isActive: true
       });
       
@@ -3265,46 +3286,82 @@ const deleteProject = async (projectId: number) => {
                       </select>
                       
                       {showNewEditorInput && (
-                        <div className="flex space-x-2 mt-2">
-                          <input
-                            type="text"
-                            value={newEditorName}
-                            onChange={(e) => setNewEditorName(e.target.value)}
-                            placeholder="Enter editor name"
-                            className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            onKeyPress={async (e) => {
-                              if (e.key === 'Enter') {
-                                const newEditor = await createNewEditor(newEditorName);
-                                if (newEditor) {
-                                  setNewProject({...newProject, defaultEditorId: newEditor.id});
+                        <div className="bg-gray-50 p-4 rounded-lg border mt-2">
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                              <input
+                                type="text"
+                                value={newEditorForm.name}
+                                onChange={(e) => setNewEditorForm({...newEditorForm, name: e.target.value})}
+                                placeholder="Editor full name"
+                                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input
+                                  type="email"
+                                  value={newEditorForm.email}
+                                  onChange={(e) => setNewEditorForm({...newEditorForm, email: e.target.value})}
+                                  placeholder="editor@email.com"
+                                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                                <input
+                                  type="text"
+                                  value={newEditorForm.country}
+                                  onChange={(e) => setNewEditorForm({...newEditorForm, country: e.target.value})}
+                                  placeholder="Indonesia"
+                                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                              <select
+                                value={newEditorForm.timezone}
+                                onChange={(e) => setNewEditorForm({...newEditorForm, timezone: e.target.value})}
+                                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">Select timezone</option>
+                                {commonTimezones.map(tz => (
+                                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div className="flex space-x-2 pt-2">
+                              <button
+                                onClick={async () => {
+                                  const newEditor = await createNewEditor(newEditorForm);
+                                  if (newEditor) {
+                                    setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                    setShowNewEditorInput(false);
+                                    setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
+                                  }
+                                }}
+                                disabled={!newEditorForm.name.trim()}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                              >
+                                Add Editor
+                              </button>
+                              <button
+                                onClick={() => {
                                   setShowNewEditorInput(false);
-                                  setNewEditorName('');
-                                }
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={async () => {
-                              const newEditor = await createNewEditor(newEditorName);
-                              if (newEditor) {
-                                setNewProject({...newProject, defaultEditorId: newEditor.id});
-                                setShowNewEditorInput(false);
-                                setNewEditorName('');
-                              }
-                            }}
-                            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowNewEditorInput(false);
-                              setNewEditorName('');
-                            }}
-                            className="px-3 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
-                          >
-                            Cancel
-                          </button>
+                                  setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
+                                }}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3330,7 +3387,7 @@ const deleteProject = async (projectId: number) => {
                   onClick={() => {
                     setShowNewProjectModal(false);
                     setShowNewEditorInput(false);
-                    setNewEditorName('');
+                    setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
                   }}
                   className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
@@ -3631,46 +3688,82 @@ const deleteProject = async (projectId: number) => {
                       </select>
                       
                       {showNewEditorInput && (
-                        <div className="flex space-x-2">
-                          <input
-                            type="text"
-                            value={newEditorName}
-                            onChange={(e) => setNewEditorName(e.target.value)}
-                            placeholder="Enter editor name"
-                            className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            onKeyPress={async (e) => {
-                              if (e.key === 'Enter') {
-                                const newEditor = await createNewEditor(newEditorName);
-                                if (newEditor) {
-                                  setNewProject({...newProject, defaultEditorId: newEditor.id});
+                        <div className="bg-gray-50 p-4 rounded-lg border mt-2">
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                              <input
+                                type="text"
+                                value={newEditorForm.name}
+                                onChange={(e) => setNewEditorForm({...newEditorForm, name: e.target.value})}
+                                placeholder="Editor full name"
+                                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input
+                                  type="email"
+                                  value={newEditorForm.email}
+                                  onChange={(e) => setNewEditorForm({...newEditorForm, email: e.target.value})}
+                                  placeholder="editor@email.com"
+                                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                                <input
+                                  type="text"
+                                  value={newEditorForm.country}
+                                  onChange={(e) => setNewEditorForm({...newEditorForm, country: e.target.value})}
+                                  placeholder="Indonesia"
+                                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                              <select
+                                value={newEditorForm.timezone}
+                                onChange={(e) => setNewEditorForm({...newEditorForm, timezone: e.target.value})}
+                                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">Select timezone</option>
+                                {commonTimezones.map(tz => (
+                                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div className="flex space-x-2 pt-2">
+                              <button
+                                onClick={async () => {
+                                  const newEditor = await createNewEditor(newEditorForm);
+                                  if (newEditor) {
+                                    setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                    setShowNewEditorInput(false);
+                                    setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
+                                  }
+                                }}
+                                disabled={!newEditorForm.name.trim()}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                              >
+                                Add Editor
+                              </button>
+                              <button
+                                onClick={() => {
                                   setShowNewEditorInput(false);
-                                  setNewEditorName('');
-                                }
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={async () => {
-                              const newEditor = await createNewEditor(newEditorName);
-                              if (newEditor) {
-                                setNewProject({...newProject, defaultEditorId: newEditor.id});
-                                setShowNewEditorInput(false);
-                                setNewEditorName('');
-                              }
-                            }}
-                            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowNewEditorInput(false);
-                              setNewEditorName('');
-                            }}
-                            className="px-3 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
-                          >
-                            Cancel
-                          </button>
+                                  setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
+                                }}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3697,7 +3790,7 @@ const deleteProject = async (projectId: number) => {
                     setShowEditProjectModal(false);
                     setEditingProject(null);
                     setShowNewEditorInput(false);
-                    setNewEditorName('');
+                    setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
                     setNewProject({
                       client: '',
                       title: '',
