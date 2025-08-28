@@ -681,6 +681,10 @@ const ContentHub = () => {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [editors, setEditors] = useState<Editor[]>([]);
+  const [showNewEditorInput, setShowNewEditorInput] = useState(false);
+  const [newEditorName, setNewEditorName] = useState('');
+  const [showNewPostEditorInput, setShowNewPostEditorInput] = useState(false);
+  const [newPostEditorName, setNewPostEditorName] = useState('');
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -1428,6 +1432,29 @@ const deleteProject = async (projectId: number) => {
     } catch (error) {
       console.error('Failed to update project:', error);
       alert('Failed to update project. Please try again.');
+    }
+  };
+
+  const createNewEditor = async (name: string): Promise<Editor | null> => {
+    if (!name.trim()) return null;
+    
+    try {
+      const newEditor = await saveEditorToSupabase({
+        name: name.trim(),
+        email: undefined,
+        timezone: undefined,
+        country: undefined,
+        isActive: true
+      });
+      
+      // Add to local state
+      setEditors(prev => [...prev, newEditor]);
+      
+      return newEditor;
+    } catch (error) {
+      console.error('Error creating editor:', error);
+      alert('Failed to create editor. Please try again.');
+      return null;
     }
   };
 
@@ -3212,21 +3239,75 @@ const deleteProject = async (projectId: number) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Project Editor
                     </label>
-                    <select
-                      value={newProject.defaultEditorId || ''}
-                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select project editor</option>
-                      {editors.map(ed => {
-                        const currentTime = getCurrentTimeForEditor(ed.timezone);
-                        return (
-                          <option key={ed.id} value={ed.id}>
-                            {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
+                    <div className="space-y-2">
+                      <select
+                        value={newProject.defaultEditorId || ''}
+                        onChange={async (e) => {
+                          if (e.target.value === 'create_new') {
+                            setShowNewEditorInput(true);
+                            setNewEditorName('');
+                          } else {
+                            setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined});
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select project editor</option>
+                        {editors.map(ed => {
+                          const currentTime = getCurrentTimeForEditor(ed.timezone);
+                          return (
+                            <option key={ed.id} value={ed.id}>
+                              {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
+                            </option>
+                          );
+                        })}
+                        <option value="create_new">+ Create New Editor</option>
+                      </select>
+                      
+                      {showNewEditorInput && (
+                        <div className="flex space-x-2 mt-2">
+                          <input
+                            type="text"
+                            value={newEditorName}
+                            onChange={(e) => setNewEditorName(e.target.value)}
+                            placeholder="Enter editor name"
+                            className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onKeyPress={async (e) => {
+                              if (e.key === 'Enter') {
+                                const newEditor = await createNewEditor(newEditorName);
+                                if (newEditor) {
+                                  setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                  setShowNewEditorInput(false);
+                                  setNewEditorName('');
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={async () => {
+                              const newEditor = await createNewEditor(newEditorName);
+                              if (newEditor) {
+                                setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                setShowNewEditorInput(false);
+                                setNewEditorName('');
+                              }
+                            }}
+                            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                          >
+                            Add
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowNewEditorInput(false);
+                              setNewEditorName('');
+                            }}
+                            className="px-3 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div>
@@ -3246,7 +3327,11 @@ const deleteProject = async (projectId: number) => {
               
               <div className="flex justify-end space-x-3 pt-6 border-t mt-6">
                   <button
-                  onClick={() => setShowNewProjectModal(false)}
+                  onClick={() => {
+                    setShowNewProjectModal(false);
+                    setShowNewEditorInput(false);
+                    setNewEditorName('');
+                  }}
                   className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                   Cancel
@@ -3520,21 +3605,75 @@ const deleteProject = async (projectId: number) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Project Editor
                     </label>
-                    <select
-                      value={newProject.defaultEditorId || ''}
-                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select project editor</option>
-                      {editors.map(ed => {
-                        const currentTime = getCurrentTimeForEditor(ed.timezone);
-                        return (
-                          <option key={ed.id} value={ed.id}>
-                            {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
+                    <div className="space-y-2">
+                      <select
+                        value={newProject.defaultEditorId || ''}
+                        onChange={async (e) => {
+                          if (e.target.value === 'create_new') {
+                            setShowNewEditorInput(true);
+                            setNewEditorName('');
+                          } else {
+                            setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined});
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select project editor</option>
+                        {editors.map(ed => {
+                          const currentTime = getCurrentTimeForEditor(ed.timezone);
+                          return (
+                            <option key={ed.id} value={ed.id}>
+                              {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
+                            </option>
+                          );
+                        })}
+                        <option value="create_new">+ Create New Editor</option>
+                      </select>
+                      
+                      {showNewEditorInput && (
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            value={newEditorName}
+                            onChange={(e) => setNewEditorName(e.target.value)}
+                            placeholder="Enter editor name"
+                            className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onKeyPress={async (e) => {
+                              if (e.key === 'Enter') {
+                                const newEditor = await createNewEditor(newEditorName);
+                                if (newEditor) {
+                                  setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                  setShowNewEditorInput(false);
+                                  setNewEditorName('');
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={async () => {
+                              const newEditor = await createNewEditor(newEditorName);
+                              if (newEditor) {
+                                setNewProject({...newProject, defaultEditorId: newEditor.id});
+                                setShowNewEditorInput(false);
+                                setNewEditorName('');
+                              }
+                            }}
+                            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                          >
+                            Add
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowNewEditorInput(false);
+                              setNewEditorName('');
+                            }}
+                            className="px-3 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div>
@@ -3557,6 +3696,8 @@ const deleteProject = async (projectId: number) => {
                   onClick={() => {
                     setShowEditProjectModal(false);
                     setEditingProject(null);
+                    setShowNewEditorInput(false);
+                    setNewEditorName('');
                     setNewProject({
                       client: '',
                       title: '',
