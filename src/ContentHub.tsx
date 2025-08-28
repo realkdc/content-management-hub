@@ -9,6 +9,15 @@ type ProjectStatus = 'draft' | 'editor_review' | 'client_review' | 'needs_revisi
 type ContentType = 'video' | 'image' | 'text';
 type PostStatus = 'scheduled' | 'posted' | 'draft';
 
+interface Editor {
+  id: number;
+  name: string;
+  email?: string;
+  timezone?: string;
+  country?: string;
+  isActive: boolean;
+}
+
 interface PostedContent {
   id: number;
   projectId: number;
@@ -27,6 +36,8 @@ interface PostedContent {
   scheduledDate: string;
   postedDate: string;
   status: PostStatus;
+  editorId?: number;
+  editorName?: string;
   analytics: {
     views?: number;
     shares?: number;
@@ -330,11 +341,72 @@ const loadFilesForProject = async (projectId: number): Promise<ProjectFile[]> =>
   }
 };
 
+// Editor management functions
+const loadEditorsFromSupabase = async (): Promise<Editor[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('editors')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    
+    if (error) throw error;
+    
+    return (data || []).map((editor: any) => ({
+      id: editor.id,
+      name: editor.name,
+      email: editor.email,
+      timezone: editor.timezone,
+      country: editor.country,
+      isActive: editor.is_active
+    }));
+  } catch (error) {
+    console.error('Error loading editors:', error);
+    return [];
+  }
+};
+
+const saveEditorToSupabase = async (editor: Omit<Editor, 'id'>): Promise<Editor> => {
+  try {
+    const { data, error } = await supabase
+      .from('editors')
+      .insert([{
+        name: editor.name,
+        email: editor.email,
+        timezone: editor.timezone,
+        country: editor.country,
+        is_active: editor.isActive
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      timezone: data.timezone,
+      country: data.country,
+      isActive: data.is_active
+    };
+  } catch (error) {
+    console.error('Error saving editor:', error);
+    throw error;
+  }
+};
+
 const loadPostedContentFromSupabase = async (): Promise<PostedContent[]> => {
   try {
     const { data, error } = await supabase
       .from('posted_content')
-      .select('*')
+      .select(`
+        *,
+        editors (
+          id,
+          name
+        )
+      `)
       .order('scheduled_date', { ascending: false });
     
     if (error) throw error;
@@ -357,6 +429,8 @@ const loadPostedContentFromSupabase = async (): Promise<PostedContent[]> => {
       scheduledDate: post.scheduled_date,
       postedDate: post.posted_date,
       status: post.status,
+      editorId: post.editor_id,
+      editorName: post.editors?.name,
       analytics: post.analytics || {}
     }));
   } catch (error) {
@@ -386,9 +460,16 @@ const savePostedContentToSupabase = async (post: Omit<PostedContent, 'id'>): Pro
         scheduled_date: post.scheduledDate,
         posted_date: post.postedDate,
         status: post.status,
+        editor_id: post.editorId,
         analytics: post.analytics
       }])
-      .select()
+      .select(`
+        *,
+        editors (
+          id,
+          name
+        )
+      `)
       .single();
     
     if (error) throw error;
@@ -411,6 +492,8 @@ const savePostedContentToSupabase = async (post: Omit<PostedContent, 'id'>): Pro
       scheduledDate: data.scheduled_date,
       postedDate: data.posted_date,
       status: data.status,
+      editorId: data.editor_id,
+      editorName: data.editors?.name,
       analytics: data.analytics || {}
     };
   } catch (error) {
@@ -471,6 +554,7 @@ const updatePostedContentInSupabase = async (postId: number, updates: Partial<Po
     if (updates.liveLink) cleanUpdates.live_link = updates.liveLink;
     if (updates.platform) cleanUpdates.platform = updates.platform;
     if (updates.status) cleanUpdates.status = updates.status;
+    if (updates.editorId !== undefined) cleanUpdates.editor_id = updates.editorId;
     if (updates.analytics) cleanUpdates.analytics = updates.analytics;
     
     // Handle dates properly - only include if they're valid
@@ -526,20 +610,23 @@ const ContentHub = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [projectsData, clientsData, postedContentData] = await Promise.all([
+        const [projectsData, clientsData, postedContentData, editorsData] = await Promise.all([
           loadProjectsFromSupabase(),
           loadClientsFromSupabase(),
-          loadPostedContentFromSupabase()
+          loadPostedContentFromSupabase(),
+          loadEditorsFromSupabase()
         ]);
         setProjects(projectsData);
         setClients(clientsData);
         setPostedContent(postedContentData);
+        setEditors(editorsData);
       } catch (error) {
         console.error('Error loading data:', error);
         // If there's an error (like missing table), start with empty data
         setProjects([]);
         setClients([]);
         setPostedContent([]);
+        setEditors([]);
       }
       setLoading(false);
     };
@@ -549,6 +636,7 @@ const ContentHub = () => {
   // Sample projects are now loaded from Supabase database
 
   const [clients, setClients] = useState<Client[]>([]);
+  const [editors, setEditors] = useState<Editor[]>([]);
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -631,6 +719,7 @@ const ContentHub = () => {
     scheduledDate: string;
     postedDate: string;
     status: PostStatus;
+    editorId?: number;
     analytics: {
       views?: number;
       shares?: number;
@@ -654,6 +743,7 @@ const ContentHub = () => {
     scheduledDate: '',
     postedDate: '',
     status: 'draft',
+    editorId: undefined,
     analytics: {}
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1418,6 +1508,7 @@ const deleteProject = async (projectId: number) => {
       scheduledDate: formatDateForInput(post.scheduledDate),
       postedDate: formatDateForInput(post.postedDate),
       status: post.status,
+      editorId: post.editorId,
       analytics: post.analytics
     });
     setShowEditPostModal(true);
@@ -2358,6 +2449,10 @@ const deleteProject = async (projectId: number) => {
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Platform:</span>
                       <span>{post.platform || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Editor:</span>
+                      <span>{post.editorName || 'Not assigned'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Status:</span>
@@ -3655,6 +3750,47 @@ const deleteProject = async (projectId: number) => {
                     </div>
                   </div>
                   
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Assigned Editor
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={newPost.editorId || ''}
+                        onChange={(e) => {
+                          const editorId = e.target.value === 'new' ? undefined : (e.target.value ? parseInt(e.target.value) : undefined);
+                          if (e.target.value === 'new') {
+                            const newEditorName = prompt('Enter new editor name:');
+                            if (newEditorName && newEditorName.trim()) {
+                              const newEditor: Omit<Editor, 'id'> = {
+                                name: newEditorName.trim(),
+                                isActive: true
+                              };
+                              saveEditorToSupabase(newEditor).then((savedEditor) => {
+                                setEditors([...editors, savedEditor]);
+                                setNewPost({...newPost, editorId: savedEditor.id});
+                              }).catch(error => {
+                                console.error('Error creating editor:', error);
+                                alert('Failed to create new editor');
+                              });
+                            }
+                          } else {
+                            setNewPost({...newPost, editorId});
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Editor</option>
+                        {editors.map((editor) => (
+                          <option key={editor.id} value={editor.id}>
+                            {editor.name} {editor.timezone && `(${editor.timezone})`}
+                          </option>
+                        ))}
+                        <option value="new">+ Create New Editor</option>
+                      </select>
+                    </div>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3828,6 +3964,7 @@ const deleteProject = async (projectId: number) => {
                       scheduledDate: '',
                       postedDate: '',
                       status: 'draft',
+                      editorId: undefined,
                       analytics: {}
                     });
                   }}
@@ -3922,6 +4059,47 @@ const deleteProject = async (projectId: number) => {
                         <option value="Twitter">Twitter</option>
                         <option value="YouTube">YouTube</option>
                         <option value="LinkedIn">LinkedIn</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Assigned Editor
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={newPost.editorId || ''}
+                        onChange={(e) => {
+                          const editorId = e.target.value === 'new' ? undefined : (e.target.value ? parseInt(e.target.value) : undefined);
+                          if (e.target.value === 'new') {
+                            const newEditorName = prompt('Enter new editor name:');
+                            if (newEditorName && newEditorName.trim()) {
+                              const newEditor: Omit<Editor, 'id'> = {
+                                name: newEditorName.trim(),
+                                isActive: true
+                              };
+                              saveEditorToSupabase(newEditor).then((savedEditor) => {
+                                setEditors([...editors, savedEditor]);
+                                setNewPost({...newPost, editorId: savedEditor.id});
+                              }).catch(error => {
+                                console.error('Error creating editor:', error);
+                                alert('Failed to create new editor');
+                              });
+                            }
+                          } else {
+                            setNewPost({...newPost, editorId});
+                          }
+                        }}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Editor</option>
+                        {editors.map((editor) => (
+                          <option key={editor.id} value={editor.id}>
+                            {editor.name} {editor.timezone && `(${editor.timezone})`}
+                          </option>
+                        ))}
+                        <option value="new">+ Create New Editor</option>
                       </select>
                     </div>
                   </div>

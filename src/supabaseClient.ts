@@ -56,3 +56,14 @@ export interface DatabaseProjectFile {
   previous_version_id?: string;
   created_at: string;
 }
+
+export interface DatabaseEditor {
+  id: number;
+  name: string;
+  email?: string;
+  timezone?: string;
+  country?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
