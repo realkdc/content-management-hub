@@ -27,6 +27,7 @@ export interface DatabaseProject {
   last_activity: string;
   tags?: string[];
   drive_links?: string[];
+  default_editor_id?: number;
   created_at: string;
   updated_at: string;
 }

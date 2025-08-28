@@ -83,3 +83,8 @@ CREATE TRIGGER update_editors_updated_at
 -- Safely add drive_links text[] column to projects if missing
 ALTER TABLE public.projects
     ADD COLUMN IF NOT EXISTS drive_links TEXT[] DEFAULT '{}'::text[];
+
+-- Default editor per project
+ALTER TABLE public.projects
+    ADD COLUMN IF NOT EXISTS default_editor_id BIGINT REFERENCES public.editors(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_projects_default_editor_id ON public.projects(default_editor_id);

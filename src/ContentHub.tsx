@@ -65,6 +65,7 @@ interface Project {
   platforms?: string[]; // Instagram, TikTok, etc.
   deliverables?: string; // What exactly will be delivered
   driveLinks?: string[]; // Google Drive or asset links
+  defaultEditorId?: number; // Default editor for this project
   feedback: string | null;
   lastActivity: string;
   files?: ProjectFile[];
@@ -159,6 +160,7 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
       platforms: project.platforms || [],
       deliverables: project.deliverables,
       driveLinks: project.drive_links || [],
+      defaultEditorId: project.default_editor_id,
       feedback: project.feedback || null,
       lastActivity: project.last_activity,
       tags: project.tags || [],
@@ -264,6 +266,7 @@ const updateProjectInSupabase = async (projectId: number, updates: Partial<Proje
         platforms: updates.platforms,
         deliverables: updates.deliverables,
         drive_links: updates.driveLinks,
+        default_editor_id: updates.defaultEditorId,
         tags: updates.tags,
         last_activity: 'Project updated'
       })
@@ -682,6 +685,7 @@ const ContentHub = () => {
     platforms: string[];
     deliverables: string;
     driveLinks: string[];
+    defaultEditorId?: number;
     tags: string[];
   }>({
     client: '',
@@ -698,6 +702,7 @@ const ContentHub = () => {
     platforms: [],
     deliverables: '',
     driveLinks: [],
+    defaultEditorId: undefined,
     tags: []
   });
   const [newClient, setNewClient] = useState<{ name: string; email: string; company: string; phone: string }>({
@@ -1283,6 +1288,8 @@ const deleteProject = async (projectId: number) => {
       targetAudience: project.targetAudience || '',
       platforms: project.platforms || [],
       deliverables: project.deliverables || '',
+      driveLinks: project.driveLinks || [],
+      defaultEditorId: project.defaultEditorId,
       tags: project.tags || []
     });
     setShowEditProjectModal(true);
@@ -1309,6 +1316,7 @@ const deleteProject = async (projectId: number) => {
         targetAudience: newProject.targetAudience,
         platforms: newProject.platforms,
         deliverables: newProject.deliverables,
+        driveLinks: newProject.driveLinks,
         tags: newProject.tags
       });
     
@@ -1373,6 +1381,7 @@ const deleteProject = async (projectId: number) => {
         targetAudience: '',
         platforms: [],
         deliverables: '',
+        driveLinks: [],
         tags: []
       });
       setEditingProject(null);
@@ -1763,6 +1772,7 @@ const deleteProject = async (projectId: number) => {
             platforms: newProject.platforms,
             deliverables: newProject.deliverables,
             drive_links: newProject.driveLinks,
+            default_editor_id: newProject.defaultEditorId,
       feedback: null,
             last_activity: 'Project created',
             tags: newProject.tags
@@ -1825,6 +1835,7 @@ const deleteProject = async (projectId: number) => {
       targetAudience: '',
       platforms: [],
       deliverables: '',
+      driveLinks: [],
       tags: []
     });
     setShowNewProjectModal(false);
@@ -3160,6 +3171,38 @@ const deleteProject = async (projectId: number) => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Default Editor
+                    </label>
+                    <select
+                      value={newProject.defaultEditorId || ''}
+                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select default editor</option>
+                      {editors.map(ed => (
+                        <option key={ed.id} value={ed.id}>{ed.name}{ed.timezone ? ` (${ed.timezone})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Default Editor
+                    </label>
+                    <select
+                      value={newProject.defaultEditorId || ''}
+                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select default editor</option>
+                      {editors.map(ed => (
+                        <option key={ed.id} value={ed.id}>{ed.name}{ed.timezone ? ` (${ed.timezone})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Google Drive / Asset Links
                     </label>
                     <textarea
@@ -3230,6 +3273,7 @@ const deleteProject = async (projectId: number) => {
                       targetAudience: '',
                       platforms: [],
                       deliverables: '',
+                      driveLinks: [],
                       tags: []
                     });
                   }}
@@ -3478,6 +3522,7 @@ const deleteProject = async (projectId: number) => {
                       targetAudience: '',
                       platforms: [],
                       deliverables: '',
+                      driveLinks: [],
                       tags: []
                     });
                   }}
