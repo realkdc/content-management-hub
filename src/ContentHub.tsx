@@ -873,7 +873,7 @@ const ContentHub = () => {
   };
 
   const getFilteredAndSortedProjects = () => {
-    let filtered = projects;
+    let filtered = [...projects]; // Clone to avoid mutating state
 
     // Filter by type
     if (filterType !== 'all') {
@@ -1141,6 +1141,25 @@ const ContentHub = () => {
         alert('Failed to delete file from S3. Please try again.');
         return; // Don't update UI if S3 delete failed
       }
+    }
+
+    // Delete from database
+    try {
+      const { error } = await supabase
+        .from('project_files')
+        .delete()
+        .eq('id', fileId)
+        .eq('project_id', projectId);
+      
+      if (error) {
+        console.error('Failed to delete from database:', error);
+        alert('Failed to delete file from database. Please try again.');
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to delete from database:', error);
+      alert('Failed to delete file from database. Please try again.');
+      return;
     }
 
     // Update projects state
