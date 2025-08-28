@@ -78,3 +78,8 @@ CREATE TRIGGER update_editors_updated_at
     BEFORE UPDATE ON public.editors 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Project enhancements: add Google Drive links storage
+-- Safely add drive_links text[] column to projects if missing
+ALTER TABLE public.projects
+    ADD COLUMN IF NOT EXISTS drive_links TEXT[] DEFAULT '{}'::text[];

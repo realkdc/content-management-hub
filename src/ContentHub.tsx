@@ -64,6 +64,7 @@ interface Project {
   targetAudience?: string;
   platforms?: string[]; // Instagram, TikTok, etc.
   deliverables?: string; // What exactly will be delivered
+  driveLinks?: string[]; // Google Drive or asset links
   feedback: string | null;
   lastActivity: string;
   files?: ProjectFile[];
@@ -157,6 +158,7 @@ const loadProjectsFromSupabase = async (): Promise<Project[]> => {
       targetAudience: project.target_audience,
       platforms: project.platforms || [],
       deliverables: project.deliverables,
+      driveLinks: project.drive_links || [],
       feedback: project.feedback || null,
       lastActivity: project.last_activity,
       tags: project.tags || [],
@@ -261,6 +263,7 @@ const updateProjectInSupabase = async (projectId: number, updates: Partial<Proje
         target_audience: updates.targetAudience,
         platforms: updates.platforms,
         deliverables: updates.deliverables,
+        drive_links: updates.driveLinks,
         tags: updates.tags,
         last_activity: 'Project updated'
       })
@@ -678,6 +681,7 @@ const ContentHub = () => {
     targetAudience: string;
     platforms: string[];
     deliverables: string;
+    driveLinks: string[];
     tags: string[];
   }>({
     client: '',
@@ -693,6 +697,7 @@ const ContentHub = () => {
     targetAudience: '',
     platforms: [],
     deliverables: '',
+    driveLinks: [],
     tags: []
   });
   const [newClient, setNewClient] = useState<{ name: string; email: string; company: string; phone: string }>({
@@ -1757,6 +1762,7 @@ const deleteProject = async (projectId: number) => {
             target_audience: newProject.targetAudience,
             platforms: newProject.platforms,
             deliverables: newProject.deliverables,
+            drive_links: newProject.driveLinks,
       feedback: null,
             last_activity: 'Project created',
             tags: newProject.tags
@@ -3137,6 +3143,30 @@ const deleteProject = async (projectId: number) => {
                       onChange={(e) => setNewProject({...newProject, deliverables: e.target.value})}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
                       placeholder="What exactly will be delivered? e.g., 3 video versions, captions, thumbnails"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Google Drive / Asset Links
+                    </label>
+                    <textarea
+                      value={newProject.driveLinks.join('\n')}
+                      onChange={(e) => setNewProject({...newProject, driveLinks: e.target.value.split('\n').map(s => s.trim()).filter(Boolean)})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-y"
+                      placeholder="Paste one URL per line (e.g., Google Drive, Dropbox, etc.)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Google Drive / Asset Links
+                    </label>
+                    <textarea
+                      value={newProject.driveLinks.join('\n')}
+                      onChange={(e) => setNewProject({...newProject, driveLinks: e.target.value.split('\n').map(s => s.trim()).filter(Boolean)})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-y"
+                      placeholder="Paste one URL per line (e.g., Google Drive, Dropbox, etc.)"
                     />
                   </div>
                   

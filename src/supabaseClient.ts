@@ -26,6 +26,7 @@ export interface DatabaseProject {
   feedback?: string;
   last_activity: string;
   tags?: string[];
+  drive_links?: string[];
   created_at: string;
   updated_at: string;
 }
