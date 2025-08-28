@@ -3201,17 +3201,7 @@ const deleteProject = async (projectId: number) => {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Google Drive / Asset Links
-                    </label>
-                    <textarea
-                      value={newProject.driveLinks.join('\n')}
-                      onChange={(e) => setNewProject({...newProject, driveLinks: e.target.value.split('\n').map(s => s.trim()).filter(Boolean)})}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-y"
-                      placeholder="Paste one URL per line (e.g., Google Drive, Dropbox, etc.)"
-                    />
-                  </div>
+                  
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
