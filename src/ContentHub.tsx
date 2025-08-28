@@ -589,6 +589,44 @@ const updatePostedContentInSupabase = async (postId: number, updates: Partial<Po
 };
 
 
+// Utility function to get current time for editors based on timezone
+const getCurrentTimeForEditor = (timezone?: string): string => {
+  if (!timezone) return '';
+  
+  try {
+    // Map common timezone formats to proper IANA timezone identifiers
+    const timezoneMap: { [key: string]: string } = {
+      'GMT+7 (WIB)': 'Asia/Jakarta',
+      'GMT+7': 'Asia/Jakarta', 
+      'WIB': 'Asia/Jakarta',
+      'GMT+8': 'Asia/Singapore',
+      'GMT+9': 'Asia/Tokyo',
+      'GMT+0': 'UTC',
+      'GMT': 'UTC',
+      'EST': 'America/New_York',
+      'PST': 'America/Los_Angeles',
+      'CST': 'America/Chicago'
+    };
+    
+    const normalizedTimezone = timezoneMap[timezone] || timezone;
+    const now = new Date();
+    
+    // Try to format with the timezone
+    try {
+      return now.toLocaleTimeString('en-US', {
+        timeZone: normalizedTimezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (timezoneError) {
+      // If timezone parsing fails, just show the timezone string
+      return timezone;
+    }
+  } catch (error) {
+    return timezone || '';
+  }
+};
 
 const ContentHub = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -1412,6 +1450,7 @@ const deleteProject = async (projectId: number) => {
       scheduledDate: today,
       postedDate: today,
       status: 'draft',
+      editorId: project.defaultEditorId, // Auto-prefill from project's assigned editor
       analytics: {}
     });
     setShowNewPostModal(true);
@@ -3171,37 +3210,24 @@ const deleteProject = async (projectId: number) => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Default Editor
+                      Project Editor
                     </label>
                     <select
                       value={newProject.defaultEditorId || ''}
                       onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">Select default editor</option>
-                      {editors.map(ed => (
-                        <option key={ed.id} value={ed.id}>{ed.name}{ed.timezone ? ` (${ed.timezone})` : ''}</option>
-                      ))}
+                      <option value="">Select project editor</option>
+                      {editors.map(ed => {
+                        const currentTime = getCurrentTimeForEditor(ed.timezone);
+                        return (
+                          <option key={ed.id} value={ed.id}>
+                            {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Default Editor
-                    </label>
-                    <select
-                      value={newProject.defaultEditorId || ''}
-                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select default editor</option>
-                      {editors.map(ed => (
-                        <option key={ed.id} value={ed.id}>{ed.name}{ed.timezone ? ` (${ed.timezone})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3476,6 +3502,39 @@ const deleteProject = async (projectId: number) => {
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
                       placeholder="What exactly will be delivered? e.g., 3 video versions, captions, thumbnails"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Google Drive / Asset Links
+                    </label>
+                    <textarea
+                      value={newProject.driveLinks.join('\n')}
+                      onChange={(e) => setNewProject({...newProject, driveLinks: e.target.value.split('\n').map(s => s.trim()).filter(Boolean)})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24 resize-y"
+                      placeholder="Paste one URL per line (e.g., Google Drive, Dropbox, etc.)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Editor
+                    </label>
+                    <select
+                      value={newProject.defaultEditorId || ''}
+                      onChange={(e) => setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select project editor</option>
+                      {editors.map(ed => {
+                        const currentTime = getCurrentTimeForEditor(ed.timezone);
+                        return (
+                          <option key={ed.id} value={ed.id}>
+                            {ed.name}{ed.timezone ? ` (${ed.timezone}${currentTime ? ` - ${currentTime}` : ''})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                   
                   <div>
