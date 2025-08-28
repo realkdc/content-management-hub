@@ -3266,7 +3266,7 @@ const deleteProject = async (projectId: number) => {
                         onChange={async (e) => {
                           if (e.target.value === 'create_new') {
                             setShowNewEditorInput(true);
-                            setNewEditorName('');
+                            setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
                           } else {
                             setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined});
                           }
@@ -3668,7 +3668,7 @@ const deleteProject = async (projectId: number) => {
                         onChange={async (e) => {
                           if (e.target.value === 'create_new') {
                             setShowNewEditorInput(true);
-                            setNewEditorName('');
+                            setNewEditorForm({ name: '', email: '', timezone: '', country: '' });
                           } else {
                             setNewProject({...newProject, defaultEditorId: e.target.value ? parseInt(e.target.value) : undefined});
                           }
