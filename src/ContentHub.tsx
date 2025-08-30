@@ -1399,6 +1399,7 @@ const deleteProject = async (projectId: number) => {
         platforms: newProject.platforms,
         deliverables: newProject.deliverables,
         driveLinks: newProject.driveLinks,
+        defaultEditorId: newProject.defaultEditorId,
         tags: newProject.tags
       });
     
@@ -1420,6 +1421,8 @@ const deleteProject = async (projectId: number) => {
               targetAudience: newProject.targetAudience,
               platforms: newProject.platforms,
               deliverables: newProject.deliverables,
+              driveLinks: newProject.driveLinks,
+              defaultEditorId: newProject.defaultEditorId,
               tags: newProject.tags,
               lastActivity: 'Project updated'
             }
@@ -1443,6 +1446,8 @@ const deleteProject = async (projectId: number) => {
           targetAudience: newProject.targetAudience,
           platforms: newProject.platforms,
           deliverables: newProject.deliverables,
+          driveLinks: newProject.driveLinks,
+          defaultEditorId: newProject.defaultEditorId,
           tags: newProject.tags,
           lastActivity: 'Project updated'
         } : null);
@@ -1464,6 +1469,7 @@ const deleteProject = async (projectId: number) => {
         platforms: [],
         deliverables: '',
         driveLinks: [],
+        defaultEditorId: undefined,
         tags: []
       });
       setEditingProject(null);
